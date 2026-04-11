@@ -3,7 +3,7 @@ const http = require("http");
 const socketIo = require("socket.io");
 const app = require("./app");
 const connectDB = require("./config/db");
-const { registerSocketHandlers } = require("./sockets/socket");
+const registerSocketHandlers = require("./sockets/socket");
 const { createIndexes } = require("./config/indexes");
 
 const PORT = process.env.PORT || 3000;
