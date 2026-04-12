@@ -23,6 +23,17 @@ const projectSchema = new mongoose.Schema(
       enum: ["planning", "in-progress", "completed"],
       default: "planning",
     },
+    progress: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 100,
+    },
+    organization: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
@@ -34,8 +45,20 @@ const projectSchema = new mongoose.Schema(
         ref: "User",
       },
     ],
+    isDeleted: {
+      type: Boolean,
+      default: false,
+    },
   },
   { timestamps: true }
 );
+
+projectSchema.index({ organization: 1 });
+projectSchema.index({ createdBy: 1 });
+projectSchema.index({ members: 1 });
+projectSchema.index({ status: 1 });
+projectSchema.index({ isDeleted: 1 });
+projectSchema.index({ createdAt: -1 });
+projectSchema.index({ title: "text", description: "text" });
 
 module.exports = mongoose.model("Project", projectSchema);

@@ -5,7 +5,7 @@ const {
   getProjects,
   getProjectById,
   updateProject,
-  deleteProject,
+  softDeleteProject,
 } = require("../controllers/projectController");
 
 const router = express.Router();
@@ -14,6 +14,6 @@ router.post("/", authMiddleware, createProject);
 router.get("/", authMiddleware, getProjects);
 router.get("/:id", authMiddleware, getProjectById);
 router.put("/:id", authMiddleware, updateProject);
-router.delete("/:id", authMiddleware, deleteProject);
+router.delete("/:id", authMiddleware, softDeleteProject);
 
 module.exports = router;

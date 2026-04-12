@@ -2,9 +2,9 @@ const ActivityLog = require("../models/activityLog");
 const { AppError } = require("../errors/AppError");
 const { getPaginationParams, createPaginatedResponse } = require("../utils/pagination");
 
-async function logActivity(userId, action, entity, entityId, metadata = {}, ipAddress, userAgent) {
-  if (!userId || !action || !entity || !entityId) {
-    throw new AppError(400, "User ID, action, entity, and entity ID are required.");
+async function logActivity(userId, action, entity, entityId, organization, metadata = {}, ipAddress, userAgent, before = null, after = null) {
+  if (!userId || !action || !entity || !entityId || !organization) {
+    throw new AppError(400, "User ID, action, entity, entity ID, and organization are required.");
   }
 
   const log = await ActivityLog.create({
@@ -12,6 +12,9 @@ async function logActivity(userId, action, entity, entityId, metadata = {}, ipAd
     action: action.trim(),
     entity,
     entityId,
+    organization,
+    before,
+    after,
     metadata,
     ipAddress,
     userAgent,
@@ -21,14 +24,14 @@ async function logActivity(userId, action, entity, entityId, metadata = {}, ipAd
     .populate('user', 'name email');
 }
 
-async function getUserActivityLogs(userId, page = 1, limit = 20, filters = {}) {
+async function getUserActivityLogs(userId, organization, page = 1, limit = 20, filters = {}) {
   if (!userId) {
     throw new AppError(400, "User ID is required.");
   }
 
   const { limit: validatedLimit, skip } = getPaginationParams({ page, limit });
 
-  let query = { user: userId };
+  let query = { user: userId, organization };
   
   if (filters.action) {
     query.action = filters.action;
@@ -56,10 +59,10 @@ async function getUserActivityLogs(userId, page = 1, limit = 20, filters = {}) {
   return createPaginatedResponse(logs, total, page, validatedLimit);
 }
 
-async function getSystemActivityLogs(page = 1, limit = 20, filters = {}) {
+async function getSystemActivityLogs(organization, page = 1, limit = 20, filters = {}) {
   const { limit: validatedLimit, skip } = getPaginationParams({ page, limit });
 
-  let query = {};
+  let query = { organization };
   
   if (filters.action) {
     query.action = filters.action;
@@ -163,8 +166,8 @@ async function getActivityMetrics(filters = {}) {
   };
 }
 
-async function getRecentActivity(limit = 10) {
-  const logs = await ActivityLog.find()
+async function getRecentActivity(organization, limit = 10) {
+  const logs = await ActivityLog.find({ organization })
     .populate('user', 'name email')
     .sort({ createdAt: -1 })
     .limit(limit);

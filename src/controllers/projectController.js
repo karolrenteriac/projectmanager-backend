@@ -43,10 +43,10 @@ const updateProject = async (req, res, next) => {
   }
 };
 
-const deleteProject = async (req, res, next) => {
+const softDeleteProject = async (req, res, next) => {
   try {
-    await projectService.deleteProject(req.params.id, req.user);
-    return res.json({ message: "Project deleted successfully" });
+    const result = await projectService.softDeleteProject(req.params.id, req.user);
+    return res.json({ message: result.message });
   } catch (err) {
     handleError(err, res, next);
   }
@@ -57,5 +57,5 @@ module.exports = {
   getProjects,
   getProjectById,
   updateProject,
-  deleteProject,
+  softDeleteProject,
 };

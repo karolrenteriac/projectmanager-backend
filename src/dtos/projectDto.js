@@ -15,8 +15,11 @@ function toProjectDTO(project) {
     startDate: p.startDate,
     endDate: p.endDate,
     status: p.status,
+    progress: p.progress || 0,
+    organization: p.organization,
     createdBy: toUserDTO(p.createdBy),
     members: Array.isArray(p.members) ? p.members.map((m) => toUserDTO(m)) : [],
+    isDeleted: p.isDeleted || false,
     createdAt: p.createdAt,
     updatedAt: p.updatedAt,
   };
@@ -32,6 +35,7 @@ function toProjectSummaryDTO(project) {
     id: p._id != null ? p._id.toString() : String(p.id),
     title: p.title,
     status: p.status,
+    progress: p.progress || 0,
   };
 }
 

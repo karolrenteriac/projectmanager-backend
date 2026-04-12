@@ -34,8 +34,20 @@ const updateTaskStatus = async (req, res, next) => {
   }
 };
 
+const softDeleteTask = async (req, res, next) => {
+  try {
+    const result = await taskService.softDeleteTask(req.params.id, req.user);
+    return res.json({
+      message: result.message,
+    });
+  } catch (err) {
+    handleError(err, res, next);
+  }
+};
+
 module.exports = {
   createTask,
   getTasksByProject,
   updateTaskStatus,
+  softDeleteTask,
 };

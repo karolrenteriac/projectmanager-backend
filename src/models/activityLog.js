@@ -14,12 +14,25 @@ const activityLogSchema = new mongoose.Schema(
     },
     entity: {
       type: String,
-      enum: ["PROJECT", "TASK", "DOCUMENT", "USER", "CHAT", "MESSAGE"],
+      enum: ["PROJECT", "TASK", "DOCUMENT", "USER", "CHAT", "MESSAGE", "PROJECT_MEMBER"],
       required: true,
     },
     entityId: {
       type: mongoose.Schema.Types.ObjectId,
       required: true,
+    },
+    organization: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    before: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
+    },
+    after: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
     },
     metadata: {
       type: mongoose.Schema.Types.Mixed,
@@ -37,6 +50,7 @@ const activityLogSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+activityLogSchema.index({ organization: 1 });
 activityLogSchema.index({ user: 1 });
 activityLogSchema.index({ action: 1 });
 activityLogSchema.index({ entity: 1 });

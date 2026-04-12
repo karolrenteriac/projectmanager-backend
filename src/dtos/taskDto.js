@@ -20,7 +20,9 @@ function toTaskDTO(task) {
     status: t.status,
     assignedTo: toUserDTO(t.assignedTo),
     project,
+    organization: t.organization,
     createdBy: toUserDTO(t.createdBy),
+    isDeleted: t.isDeleted || false,
     createdAt: t.createdAt,
     updatedAt: t.updatedAt,
   };

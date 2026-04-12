@@ -4,34 +4,41 @@ const Document = require("../models/document");
 const Event = require("../models/event");
 const ActivityLog = require("../models/activityLog");
 const User = require("../models/user");
+const ProjectMember = require("../models/projectMember");
+const Chat = require("../models/chat");
 
 async function createIndexes() {
   try {
     // Project indexes
     await Project.collection.createIndexes([
       { key: { title: "text", description: "text" } },
+      { key: { organization: 1 } },
       { key: { createdBy: 1 } },
       { key: { members: 1 } },
       { key: { status: 1 } },
+      { key: { isDeleted: 1 } },
       { key: { createdAt: -1 } }
     ]);
 
     // Task indexes
     await Task.collection.createIndexes([
       { key: { title: "text", description: "text" } },
+      { key: { organization: 1 } },
       { key: { assignedTo: 1 } },
       { key: { project: 1 } },
       { key: { status: 1 } },
-      { key: { priority: 1 } },
+      { key: { isDeleted: 1 } },
       { key: { createdAt: -1 } }
     ]);
 
     // Document indexes
     await Document.collection.createIndexes([
       { key: { name: "text" } },
+      { key: { organization: 1 } },
       { key: { project: 1 } },
       { key: { createdBy: 1 } },
       { key: { currentVersion: 1 } },
+      { key: { isDeleted: 1 } },
       { key: { createdAt: -1 } }
     ]);
 
@@ -50,6 +57,7 @@ async function createIndexes() {
 
     // ActivityLog indexes
     await ActivityLog.collection.createIndexes([
+      { key: { organization: 1 } },
       { key: { user: 1 } },
       { key: { action: 1 } },
       { key: { entity: 1 } },
@@ -60,7 +68,32 @@ async function createIndexes() {
     // User indexes
     await User.collection.createIndexes([
       { key: { name: "text", email: "text" } },
+      { key: { organization: 1, email: 1 }, unique: true },
+      { key: { organization: 1 } },
       { key: { role: 1 } },
+      { key: { isDeleted: 1 } },
+      { key: { createdAt: -1 } }
+    ]);
+
+    // ProjectMember indexes
+    await ProjectMember.collection.createIndexes([
+      { key: { organization: 1 } },
+      { key: { user: 1 } },
+      { key: { project: 1 } },
+      { key: { user: 1, project: 1 }, unique: true },
+      { key: { role: 1 } },
+      { key: { isDeleted: 1 } },
+      { key: { joinedAt: -1 } }
+    ]);
+
+    // Chat indexes
+    await Chat.collection.createIndexes([
+      { key: { organization: 1 } },
+      { key: { type: 1 } },
+      { key: { project: 1 } },
+      { key: { task: 1 } },
+      { key: { members: 1 } },
+      { key: { isDeleted: 1 } },
       { key: { createdAt: -1 } }
     ]);
 
