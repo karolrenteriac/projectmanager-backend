@@ -11,6 +11,7 @@ const {
   VALID_INVITATION_ROLES, 
   INVITATION_EXPIRY_HOURS 
 } = require("../constants");
+const { sendInvitationEmail } = require("./email.service");
 
 
 function generateSecureToken() {
@@ -55,10 +56,17 @@ async function createInvitation(email, role, createdBy, organization = null) {
     createdBy,
   });
 
+  // Send invitation email — failure is logged but must not break invitation creation
+  try {
+    await sendInvitationEmail(normalizedEmail, invitation.token, role);
+  } catch (emailErr) {
+    console.error("❌ Failed to send invitation email (non-critical):", emailErr.message);
+  }
+
   return toInvitationCreateResponseDTO({
     id: invitation._id,
     token: invitation.token,
-    invitationLink: `/register?token=${invitation.token}`,
+    invitationLink: `${process.env.FRONTEND_URL || "http://localhost:4200"}/auth/register?token=${invitation.token}`,
     expiresAt: invitation.expiresAt,
   });
 }
