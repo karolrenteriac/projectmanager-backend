@@ -7,22 +7,17 @@ const {
   deleteEvent, 
   getProjectEvents 
 } = require("../controllers/calendarController");
-const authMiddleware = require("../middleware/authMiddleware");
+const { protect } = require("../middleware/authMiddleware");
 
 const router = express.Router();
 
-router.use(authMiddleware);
+router.use(protect);
 
 router.post("/", createEvent);
-
 router.get("/", getEvents);
-
 router.get("/:id", getEventById);
-
 router.put("/:id", updateEvent);
-
 router.delete("/:id", deleteEvent);
-
 router.get("/project/:projectId", getProjectEvents);
 
 module.exports = router;

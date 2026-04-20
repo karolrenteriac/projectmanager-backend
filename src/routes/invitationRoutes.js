@@ -1,14 +1,17 @@
 const express = require("express");
 const { createInvitation, getInvitations, getInvitationByToken } = require("../controllers/invitationController");
-const authMiddleware = require("../middleware/authMiddleware");
+const { protect } = require("../middleware/authMiddleware");
 const roleMiddleware = require("../middleware/roleMiddleware");
 
 const router = express.Router();
 
-router.post("/", authMiddleware, roleMiddleware(["admin"]), createInvitation);
+// POST /api/invitations - Create a new invitation (Admin only)
+router.post("/", protect, roleMiddleware(["admin"]), createInvitation);
 
-router.get("/", authMiddleware, roleMiddleware(["admin"]), getInvitations);
+// GET /api/invitations - Get invitations created by the user (Admin only)
+router.get("/", protect, roleMiddleware(["admin"]), getInvitations);
 
+// GET /api/invitations/:token - Get invitation details by token (Public)
 router.get("/:token", getInvitationByToken);
 
 module.exports = router;

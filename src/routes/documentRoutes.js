@@ -1,5 +1,5 @@
 const express = require("express");
-const authMiddleware = require("../middleware/authMiddleware");
+const { protect } = require("../middleware/authMiddleware");
 const {
   uploadDocument,
   getDocumentsByProject,
@@ -7,7 +7,7 @@ const {
 
 const router = express.Router();
 
-router.post("/", authMiddleware, uploadDocument);
-router.get("/project/:projectId", authMiddleware, getDocumentsByProject);
+router.post("/", protect, uploadDocument);
+router.get("/project/:projectId", protect, getDocumentsByProject);
 
 module.exports = router;

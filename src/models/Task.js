@@ -50,4 +50,4 @@ taskSchema.index({ isDeleted: 1 });
 taskSchema.index({ createdAt: -1 });
 taskSchema.index({ title: "text", description: "text" });
 
-module.exports = mongoose.model("Task", taskSchema);
+module.exports = mongoose.models.Task || mongoose.model("Task", taskSchema);

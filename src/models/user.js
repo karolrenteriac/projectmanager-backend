@@ -38,4 +38,4 @@ userSchema.index({ isDeleted: 1 });
 userSchema.index({ createdAt: -1 });
 userSchema.index({ name: "text", email: "text" });
 
-module.exports = mongoose.model("User", userSchema);
+module.exports = mongoose.models.User || mongoose.model("User", userSchema);

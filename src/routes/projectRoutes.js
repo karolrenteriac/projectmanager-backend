@@ -1,5 +1,5 @@
 const express = require("express");
-const authMiddleware = require("../middleware/authMiddleware");
+const { protect } = require("../middleware/authMiddleware");
 const {
   createProject,
   getProjects,
@@ -10,10 +10,10 @@ const {
 
 const router = express.Router();
 
-router.post("/", authMiddleware, createProject);
-router.get("/", authMiddleware, getProjects);
-router.get("/:id", authMiddleware, getProjectById);
-router.put("/:id", authMiddleware, updateProject);
-router.delete("/:id", authMiddleware, softDeleteProject);
+router.post("/", protect, createProject);
+router.get("/", protect, getProjects);
+router.get("/:id", protect, getProjectById);
+router.put("/:id", protect, updateProject);
+router.delete("/:id", protect, softDeleteProject);
 
 module.exports = router;

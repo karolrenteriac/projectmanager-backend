@@ -61,4 +61,4 @@ projectSchema.index({ isDeleted: 1 });
 projectSchema.index({ createdAt: -1 });
 projectSchema.index({ title: "text", description: "text" });
 
-module.exports = mongoose.model("Project", projectSchema);
+module.exports = mongoose.models.Project || mongoose.model("Project", projectSchema);

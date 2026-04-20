@@ -6,11 +6,11 @@ const {
   searchDocuments, 
   searchUsers 
 } = require("../controllers/searchController");
-const authMiddleware = require("../middleware/authMiddleware");
+const { protect } = require("../middleware/authMiddleware");
 
 const router = express.Router();
 
-router.use(authMiddleware);
+router.use(protect);
 
 router.get("/global", globalSearch);
 router.get("/projects", searchProjects);

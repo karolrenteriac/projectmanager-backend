@@ -1,61 +1,62 @@
 const projectService = require("../services/projectService");
 const { handleError } = require("../utils/handleError");
 
-const createProject = async (req, res, next) => {
+/**
+ * ✅ CREATE PROJECT
+ */
+exports.createProject = async (req, res, next) => {
   try {
     const project = await projectService.createProject(req.body, req.user);
-    return res.status(201).json({
-      message: "Project created successfully",
-      project,
-    });
-  } catch (err) {
-    handleError(err, res, next);
+    return res.status(201).json(project);
+  } catch (error) {
+    handleError(error, res, next);
   }
 };
 
-const getProjects = async (req, res, next) => {
+/**
+ * ✅ GET ALL PROJECTS (User's organization)
+ */
+exports.getProjects = async (req, res, next) => {
   try {
     const projects = await projectService.getProjects(req.user);
-    return res.json({ projects });
-  } catch (err) {
-    handleError(err, res, next);
+    res.json({ projects });
+  } catch (error) {
+    handleError(error, res, next);
   }
 };
 
-const getProjectById = async (req, res, next) => {
+/**
+ * ✅ GET PROJECT BY ID
+ */
+exports.getProjectById = async (req, res, next) => {
   try {
     const project = await projectService.getProjectById(req.params.id, req.user);
-    return res.json({ project });
-  } catch (err) {
-    handleError(err, res, next);
+    res.json({ project });
+  } catch (error) {
+    handleError(error, res, next);
   }
 };
 
-const updateProject = async (req, res, next) => {
+/**
+ * ✅ UPDATE PROJECT
+ */
+exports.updateProject = async (req, res, next) => {
   try {
     const project = await projectService.updateProject(req.params.id, req.body, req.user);
-    return res.json({
-      message: "Project updated successfully",
-      project,
-    });
-  } catch (err) {
-    handleError(err, res, next);
+    res.json({ message: "Project updated successfully", project });
+  } catch (error) {
+    handleError(error, res, next);
   }
 };
 
-const softDeleteProject = async (req, res, next) => {
+/**
+ * ✅ SOFT DELETE PROJECT
+ */
+exports.softDeleteProject = async (req, res, next) => {
   try {
     const result = await projectService.softDeleteProject(req.params.id, req.user);
-    return res.json({ message: result.message });
-  } catch (err) {
-    handleError(err, res, next);
+    res.json(result);
+  } catch (error) {
+    handleError(error, res, next);
   }
-};
-
-module.exports = {
-  createProject,
-  getProjects,
-  getProjectById,
-  updateProject,
-  softDeleteProject,
 };

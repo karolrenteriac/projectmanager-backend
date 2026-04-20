@@ -1,5 +1,5 @@
 const express = require("express");
-const authMiddleware = require("../middleware/authMiddleware");
+const { protect } = require("../middleware/authMiddleware");
 const {
   createProgress,
   getProgressByProject,
@@ -7,7 +7,7 @@ const {
 
 const router = express.Router();
 
-router.post("/", authMiddleware, createProgress);
-router.get("/project/:projectId", authMiddleware, getProgressByProject);
+router.post("/", protect, createProgress);
+router.get("/project/:projectId", protect, getProgressByProject);
 
 module.exports = router;

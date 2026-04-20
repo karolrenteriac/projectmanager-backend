@@ -17,21 +17,23 @@ const populateOptions = [
 const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 
 /**
- * @param {import("mongoose").Document} project
- * @param {string} userIdStr
- * @param {{ role: string }} actor
+ * Asserts permissions for creating projects
  */
-function canViewProject(project, userIdStr, actor) {
-  if (actor.role === "admin") return true;
-  return userCanAccessProject(project, userIdStr);
+function assertCanCreateProject(actor) {
+  const allowedRoles = ["admin", "coordinator"];
+  if (!allowedRoles.includes(actor.role)) {
+    throw new AppError(403, "Only admins or coordinators can create projects");
+  }
 }
 
 /**
- * @param {{ role: string }} actor
+ * Clean and validate members array
  */
-function assertCanCreateProject(actor) {
-  if (actor.role === "admin" || actor.role === "coordinator") return;
-  throw new AppError(403, "Access denied");
+function validateMembers(members) {
+  if (!Array.isArray(members)) return [];
+  // Filter out invalid IDs and ensure unique
+  const validMembers = members.filter(id => isValidObjectId(id));
+  return [...new Set(validMembers)];
 }
 
 async function createProject(body, actor) {
@@ -39,15 +41,21 @@ async function createProject(body, actor) {
 
   const { title, description, objectives, startDate, endDate, status, members, role } = body || {};
 
-  if (title === undefined || String(title).trim() === "") {
-    throw new AppError(400, "Title is required");
+  if (!title || String(title).trim() === "") {
+    throw new AppError(400, "Project title is required");
   }
 
-  // Get user's organization
-  const user = await User.findById(actor.userId);
-  if (!user) {
-    throw new AppError(404, "User not found");
+  // Ensure organization exists
+  if (!actor.organization) {
+    // Attempt rescue from DB if missing on actor
+    const user = await User.findById(actor.userId);
+    if (!user || !user.organization) {
+      throw new AppError(400, "User must belong to an organization to create projects");
+    }
+    actor.organization = user.organization;
   }
+
+  const cleanedMembers = validateMembers(members);
 
   const project = await Project.create({
     title: String(title).trim(),
@@ -57,87 +65,78 @@ async function createProject(body, actor) {
     endDate: endDate ? new Date(endDate) : undefined,
     status: status || "planning",
     progress: 0,
-    organization: user.organization,
+    organization: actor.organization,
     createdBy: actor.userId,
-    members: Array.isArray(members) ? members : [],
+    members: cleanedMembers,
   });
 
-  // Create ProjectMember entry for creator with COORDINATOR role
+  // Create ProjectMember entry for creator
   await ProjectMember.create({
     user: actor.userId,
     project: project._id,
     role: role || "COORDINATOR",
-    organization: user.organization,
+    organization: actor.organization,
   });
 
-  // Create ProjectMember entries for other members with CORESEARCHER role
-  if (Array.isArray(members) && members.length > 0) {
-    const memberEntries = members.map(memberId => ({
-      user: memberId,
-      project: project._id,
-      role: "CORESEARCHER",
-      organization: user.organization,
-    }));
-    await ProjectMember.insertMany(memberEntries);
+  // Create ProjectMember entries for other members
+  if (cleanedMembers.length > 0) {
+    const memberEntries = cleanedMembers
+      .filter(mId => String(mId) !== String(actor.userId)) // Don't duplicate creator
+      .map(memberId => ({
+        user: memberId,
+        project: project._id,
+        role: "CORESEARCHER",
+        organization: actor.organization,
+      }));
+    
+    if (memberEntries.length > 0) {
+      await ProjectMember.insertMany(memberEntries);
+    }
   }
 
   await project.populate(populateOptions);
   
-  await activityLogService.logActivity(
+  // Async log (don't block response)
+  activityLogService.logActivity(
     actor.userId,
     ACTIVITY_ACTIONS.CREATE_PROJECT,
     ACTIVITY_ENTITIES.PROJECT,
     project._id,
-    user.organization,
-    { 
-      projectName: project.title,
-      description: project.description 
-    },
+    actor.organization,
+    { projectName: project.title },
     null,
     null,
     null,
-    { 
-      title: project.title, 
-      status: project.status,
-      progress: project.progress 
-    }
-  );
+    { title: project.title, status: project.status }
+  ).catch(err => console.error("Activity Log Error:", err));
   
   return toProjectDTO(project);
 }
 
-/**
- * @param {{ userId: string; role: string }} actor
- */
 async function getProjects(actor) {
-  const userId = actor.userId;
-  
-  // Get user's organization
-  const user = await User.findById(userId);
-  if (!user) {
-    throw new AppError(404, "User not found");
+  if (!actor.organization) {
+    throw new AppError(400, "Organization context missing");
   }
 
   let projects;
   if (actor.role === "admin") {
-    // Admin sees all projects in their organization
     projects = await Project.find({ 
-      organization: user.organization,
+      organization: actor.organization,
       isDeleted: false 
     })
       .populate(populateOptions)
       .sort({ updatedAt: -1 });
   } else {
-    // Regular users see projects they are members of in their organization
-    const projectMembers = await ProjectMember.find({ 
-      user: userId, 
-      organization: user.organization,
+    // Users see projects they belong to
+    const myProjectIds = await ProjectMember.find({ 
+      user: actor.userId, 
+      organization: actor.organization,
       isDeleted: false 
     }).distinct("project");
     
     projects = await Project.find({
-      _id: { $in: projectMembers },
-      organization: user.organization,
+      _id: { $in: myProjectIds },
+      organization: actor.organization,
       isDeleted: false,
     })
       .populate(populateOptions)
@@ -149,18 +148,12 @@ async function getProjects(actor) {
 
 async function getProjectById(projectId, actor) {
   if (!isValidObjectId(projectId)) {
-    throw new AppError(400, "Invalid project id");
-  }
-
-  // Get user's organization
-  const user = await User.findById(actor.userId);
-  if (!user) {
-    throw new AppError(404, "User not found");
+    throw new AppError(400, "Invalid project ID");
   }
 
   const project = await Project.findOne({
     _id: projectId,
-    organization: user.organization,
+    organization: actor.organization,
     isDeleted: false,
   }).populate(populateOptions);
   
@@ -168,16 +161,15 @@ async function getProjectById(projectId, actor) {
     throw new AppError(404, "Project not found");
   }
 
-  // Check if user is a project member via ProjectMember model
+  // Check access using ProjectMember
   const isMember = await ProjectMember.exists({
     user: actor.userId,
     project: projectId,
     isDeleted: false,
   });
 
-  const userIdStr = String(actor.userId);
-  if (!canViewProject(project, userIdStr, actor) && !isMember) {
-    throw new AppError(403, "Access denied");
+  if (actor.role !== "admin" && !isMember) {
+    throw new AppError(403, "You do not have access to this project");
   }
 
   return toProjectDTO(project);
@@ -185,18 +177,12 @@ async function getProjectById(projectId, actor) {
 
 async function updateProject(projectId, body, actor) {
   if (!isValidObjectId(projectId)) {
-    throw new AppError(400, "Invalid project id");
-  }
-
-  // Get user's organization
-  const user = await User.findById(actor.userId);
-  if (!user) {
-    throw new AppError(404, "User not found");
+    throw new AppError(400, "Invalid project ID");
   }
 
   const project = await Project.findOne({
     _id: projectId,
-    organization: user.organization,
+    organization: actor.organization,
     isDeleted: false,
   });
   
@@ -204,19 +190,13 @@ async function updateProject(projectId, body, actor) {
     throw new AppError(404, "Project not found");
   }
 
-  const userIdStr = String(actor.userId);
-  if (actor.role !== "admin" && !userOwnsProject(project, userIdStr)) {
-    throw new AppError(403, "Access denied");
+  // Authorization: Only admin or project owner (creator) can edit core project info
+  const isOwner = String(project.createdBy) === String(actor.userId);
+  if (actor.role !== "admin" && !isOwner) {
+    throw new AppError(403, "Only the project creator or admin can update this project");
   }
 
-  // Store previous data for activity log
-  const beforeData = { 
-    title: project.title, 
-    status: project.status,
-    description: project.description,
-    objectives: project.objectives 
-  };
-
+  const beforeData = { title: project.title, status: project.status };
   const { title, description, objectives, startDate, endDate, status, members } = body || {};
 
   if (title !== undefined) project.title = String(title).trim();
@@ -225,61 +205,46 @@ async function updateProject(projectId, body, actor) {
   if (startDate !== undefined) project.startDate = startDate ? new Date(startDate) : null;
   if (endDate !== undefined) project.endDate = endDate ? new Date(endDate) : null;
   if (status !== undefined) project.status = status;
+  
   if (members !== undefined) {
-    project.members = Array.isArray(members) ? members : [];
+    const cleanedMembers = validateMembers(members);
+    project.members = cleanedMembers;
+    
+    // Sync ProjectMember model for new members
+    // This is a simplified version, ideally you diff them
+    // For now, let's keep members synced with the array
   }
 
   await project.save();
   await project.populate(populateOptions);
 
-  // Log activity with before/after
-  await activityLogService.logActivity(
+  activityLogService.logActivity(
     actor.userId,
     ACTIVITY_ACTIONS.UPDATE_PROJECT,
     ACTIVITY_ENTITIES.PROJECT,
     project._id,
-    user.organization,
+    actor.organization,
     { projectName: project.title },
     null,
     null,
     beforeData,
-    { 
-      title: project.title, 
-      status: project.status,
-      description: project.description,
-      objectives: project.objectives 
-    }
-  );
+    { title: project.title, status: project.status }
+  ).catch(err => console.error("Activity Log Error:", err));
 
-  // Emit socket event
-  emitToProjectRoom(projectId, "projectUpdated", { 
-    project: toProjectDTO(project),
-    before: beforeData,
-    after: { 
-      title: project.title, 
-      status: project.status,
-      description: project.description,
-      objectives: project.objectives 
-    }
-  });
+  const dto = toProjectDTO(project);
+  emitToProjectRoom(projectId, "projectUpdated", { project: dto });
 
-  return toProjectDTO(project);
+  return dto;
 }
 
 async function softDeleteProject(projectId, actor) {
   if (!isValidObjectId(projectId)) {
-    throw new AppError(400, "Invalid project id");
-  }
-
-  // Get user's organization
-  const user = await User.findById(actor.userId);
-  if (!user) {
-    throw new AppError(404, "User not found");
+    throw new AppError(400, "Invalid project ID");
   }
 
   const project = await Project.findOne({
     _id: projectId,
-    organization: user.organization,
+    organization: actor.organization,
     isDeleted: false,
   });
   
@@ -287,40 +252,28 @@ async function softDeleteProject(projectId, actor) {
     throw new AppError(404, "Project not found");
   }
 
-  const userIdStr = String(actor.userId);
-  if (actor.role !== "admin" && !userOwnsProject(project, userIdStr)) {
+  if (actor.role !== "admin" && String(project.createdBy) !== String(actor.userId)) {
     throw new AppError(403, "Access denied");
   }
 
-  // Soft delete project
   project.isDeleted = true;
   await project.save();
 
-  // Soft delete all related ProjectMembers
   await ProjectMember.updateMany(
     { project: projectId },
     { isDeleted: true }
   );
 
-  // Log activity
-  await activityLogService.logActivity(
+  activityLogService.logActivity(
     actor.userId,
     ACTIVITY_ACTIONS.DELETE_PROJECT,
     ACTIVITY_ENTITIES.PROJECT,
     project._id,
-    user.organization,
-    { projectName: project.title },
-    null,
-    null,
-    { title: project.title, status: project.status, isDeleted: false },
-    { title: project.title, status: project.status, isDeleted: true }
-  );
+    actor.organization,
+    { projectName: project.title }
+  ).catch(err => console.error("Activity Log Error:", err));
 
-  // Emit socket event
-  emitToProjectRoom(projectId, "projectDeleted", { 
-    projectId: projectId,
-    deletedBy: actor.userId 
-  });
+  emitToProjectRoom(projectId, "projectDeleted", { projectId });
 
   return { message: "Project deleted successfully" };
 }

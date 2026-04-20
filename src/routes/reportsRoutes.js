@@ -7,12 +7,12 @@ const {
   generateUserActivityReport, 
   generateUserActivityExcel 
 } = require("../controllers/reportsController");
-const authMiddleware = require("../middleware/authMiddleware");
+const { protect } = require("../middleware/authMiddleware");
 const roleMiddleware = require("../middleware/roleMiddleware");
 
 const router = express.Router();
 
-router.use(authMiddleware);
+router.use(protect);
 
 router.get("/projects/pdf", roleMiddleware(["admin"]), generateProjectsReport);
 router.get("/projects/excel", roleMiddleware(["admin"]), generateProjectsExcel);

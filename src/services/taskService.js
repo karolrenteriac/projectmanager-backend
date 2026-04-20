@@ -258,9 +258,33 @@ async function softDeleteTask(taskId, actor) {
   return { message: "Task deleted successfully" };
 }
 
+async function getTaskById(taskId, actor) {
+  if (!mongoose.Types.ObjectId.isValid(taskId)) {
+    throw new AppError(400, "Invalid task ID");
+  }
+
+  const task = await Task.findOne({ _id: taskId, isDeleted: false }).populate(taskPopulate);
+  if (!task) {
+    throw new AppError(404, "Task not found");
+  }
+
+  const project = await Project.findById(task.project);
+  if (!project) {
+    throw new AppError(404, "Project not found");
+  }
+
+  // Check organization access
+  if (String(task.organization) !== String(actor.organization)) {
+    throw new AppError(403, "Access denied: Organization mismatch");
+  }
+
+  return toTaskDTO(task);
+}
+
 module.exports = {
   createTask,
   getTasksByProject,
+  getTaskById,
   updateTaskStatus,
   softDeleteTask,
 };
