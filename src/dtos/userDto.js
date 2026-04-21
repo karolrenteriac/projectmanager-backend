@@ -1,5 +1,5 @@
 /**
- * @param {import("mongoose").Document | { _id?: unknown; id?: string; name?: string; email?: string; role?: string } | null | undefined} user
+ * @param {import("mongoose").Document | { _id?: unknown; id?: string; name?: string; email?: string; role?: string; organization?: any } | null | undefined} user
  */
 function toUserDTO(user) {
   if (!user) return null;
@@ -9,6 +9,7 @@ function toUserDTO(user) {
     name: user.name,
     email: user.email,
     role: user.role,
+    organization: user.organization ? user.organization.toString() : null,
   };
 }
 

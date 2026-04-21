@@ -3,8 +3,8 @@ const { handleError } = require("../utils/handleError");
 
 const register = async (req, res, next) => {
   try {
-    await userService.register(req.body);
-    return res.status(201).json({ message: "User registered successfully." });
+    const result = await userService.register(req.body);
+    return res.status(201).json(result);
   } catch (err) {
     handleError(err, res, next);
   }

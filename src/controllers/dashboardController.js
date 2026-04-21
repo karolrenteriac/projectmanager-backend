@@ -1,5 +1,5 @@
 const Project = require("../models/project");
-const Task = require("../models/Task");
+const Task = require("../models/task");
 const User = require("../models/user");
 const Invitation = require("../models/invitation");
 const ActivityLog = require("../models/activityLog");

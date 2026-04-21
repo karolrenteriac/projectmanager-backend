@@ -1,6 +1,18 @@
 const { Resend } = require("resend");
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+let _resend = null;
+
+function getResendClient() {
+  if (!_resend) {
+    const apiKey = process.env.RESEND_API_KEY;
+    if (!apiKey) {
+      console.warn("⚠️  RESEND_API_KEY is not set — email sending will be skipped");
+      return null;
+    }
+    _resend = new Resend(apiKey);
+  }
+  return _resend;
+}
 
 /**
  * Sends an invitation email with a registration link containing the token.
@@ -13,6 +25,12 @@ async function sendInvitationEmail(to, token, role) {
   const invitationLink = `${frontendUrl}/auth/register?token=${token}`;
 
   try {
+    const resend = getResendClient();
+    if (!resend) {
+      console.warn(`⚠️  Skipping invitation email to ${to} — Resend not configured`);
+      return;
+    }
+
     const { data, error } = await resend.emails.send({
       from: "onboarding@resend.dev",
       to,

@@ -3,15 +3,16 @@ const { handleError } = require("../utils/handleError");
 
 /**
  * ✅ GET USERS (Filtered by organization)
- * Used to populate team member selectors in the frontend
+ * Used to populate team member selectors in the frontend.
+ * Only returns users belonging to the same organization as the requester.
  */
 exports.getUsers = async (req, res, next) => {
   try {
     // Safety check for user and organization
     if (!req.user || !req.user.organization) {
-      return res.status(401).json({ 
-        success: false, 
-        message: "Unauthorized: Organization context is missing" 
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized: Organization context is missing"
       });
     }
 
@@ -27,9 +28,9 @@ exports.getUsers = async (req, res, next) => {
     res.json(users);
   } catch (error) {
     console.error("Error in getUsers:", error);
-    res.status(500).json({ 
-      success: false, 
-      message: "Error loading organization users" 
+    res.status(500).json({
+      success: false,
+      message: "Error loading organization users"
     });
   }
 };

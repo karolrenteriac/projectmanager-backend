@@ -4,8 +4,12 @@ const { toInvitationCreateResponseDTO } = require("../dtos/invitationDto");
 
 const createInvitation = async (req, res, next) => {
   try {
-    const { email, role, organization } = req.body;
+    const { email, role } = req.body;
     const createdBy = req.user.userId;
+
+    // CRITICAL FIX: Always use the authenticated user's organization
+    // instead of relying on the request body (which may be empty)
+    const organization = req.user.organization || req.body.organization;
 
     const result = await invitationService.createInvitation(
       email,

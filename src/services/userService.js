@@ -1,10 +1,10 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../models/user");
+const Invitation = require("../models/invitation");
 const { AppError } = require("../errors/AppError");
 const { toUserDTO } = require("../dtos/userDto");
-const invitationService = require("./invitationService");
-const { 
+const {
   VALID_REGISTER_ROLES_WITHOUT_INVITATION,
   VALID_REGISTER_ROLES_WITH_INVITATION,
   USER_ROLES
@@ -14,7 +14,7 @@ const SALT_ROUNDS = 10;
 const JWT_SECRET = process.env.JWT_SECRET;
 
 async function register(body) {
-  const { name, email, password, role, token } = body || {};
+  const { name, email, password, token, companyName } = body || {};
 
   if (
     name === undefined ||
@@ -33,12 +33,25 @@ async function register(body) {
     throw new AppError(409, "User already exists with this email.");
   }
 
-  let userRole = role;
-  let organization = null;
+  const hashedPassword = await bcrypt.hash(String(password), SALT_ROUNDS);
+
+  let userRole;
+  let organization;
 
   if (token) {
-    const invitation = await invitationService.getInvitationByToken(token);
-    
+    // ──────────────────────────────────────────────
+    // INVITED USER FLOW
+    // ──────────────────────────────────────────────
+    const invitation = await Invitation.findOne({
+      token,
+      used: false,
+      expiresAt: { $gt: new Date() }
+    });
+
+    if (!invitation) {
+      throw new AppError(400, "Invalid or expired invitation token.");
+    }
+
     if (invitation.email !== normalizedEmail) {
       throw new AppError(400, "Email does not match invitation email.");
     }
@@ -46,29 +59,74 @@ async function register(body) {
     userRole = invitation.role;
     organization = invitation.organization;
 
-    await invitationService.markInvitationAsUsed(token, normalizedEmail);
-  } else {
-    if (userRole && !VALID_REGISTER_ROLES_WITHOUT_INVITATION.includes(userRole)) {
-      throw new AppError(400, `Only ${VALID_REGISTER_ROLES_WITHOUT_INVITATION.join(' or ')} role is allowed for registration without invitation.`);
+    if (!organization) {
+      // Fallback: use the invitation creator's organization
+      const creator = await User.findById(invitation.createdBy);
+      if (creator && creator.organization) {
+        organization = creator.organization;
+      } else {
+        throw new AppError(400, "Invitation has no valid organization.");
+      }
     }
-    userRole = USER_ROLES.ADMIN;
-  }
 
-  const hashedPassword = await bcrypt.hash(String(password), SALT_ROUNDS);
-
-  try {
-    await User.create({
+    // Create user with organization from invitation
+    const user = await User.create({
       name: String(name).trim(),
       email: normalizedEmail,
       password: hashedPassword,
       role: userRole,
-      ...(organization && { organization }),
+      organization: organization,
     });
-  } catch (err) {
-    if (err.code === 11000) {
-      throw new AppError(409, "User already exists with this email.");
+
+    // Mark invitation as used
+    invitation.used = true;
+    await invitation.save();
+
+    // Generate JWT
+    if (!JWT_SECRET) {
+      throw new AppError(500, "Server configuration error");
     }
-    throw err;
+
+    const jwtToken = jwt.sign({ userId: user._id.toString() }, JWT_SECRET, {
+      expiresIn: "7d",
+    });
+
+    return { token: jwtToken, user: toUserDTO(user) };
+
+  } else {
+    // ──────────────────────────────────────────────
+    // ADMIN SELF-REGISTRATION FLOW
+    // ──────────────────────────────────────────────
+    if (!companyName || String(companyName).trim() === "") {
+      throw new AppError(400, "Company name is required for admin registration.");
+    }
+
+    userRole = USER_ROLES.ADMIN;
+
+    // Create admin user first with a placeholder organization (self-reference)
+    // We use a new ObjectId that we'll assign as the user's _id
+    const mongoose = require("mongoose");
+    const userId = new mongoose.Types.ObjectId();
+
+    const user = await User.create({
+      _id: userId,
+      name: String(name).trim(),
+      email: normalizedEmail,
+      password: hashedPassword,
+      role: userRole,
+      organization: userId, // Admin IS the organization anchor
+    });
+
+    // Generate JWT
+    if (!JWT_SECRET) {
+      throw new AppError(500, "Server configuration error");
+    }
+
+    const jwtToken = jwt.sign({ userId: user._id.toString() }, JWT_SECRET, {
+      expiresIn: "7d",
+    });
+
+    return { token: jwtToken, user: toUserDTO(user) };
   }
 }
 
@@ -88,6 +146,10 @@ async function login(body) {
   const user = await User.findOne({ email: normalizedEmail });
   if (!user) {
     throw new AppError(401, "Invalid email or password.");
+  }
+
+  if (user.isDeleted) {
+    throw new AppError(401, "Account has been deactivated.");
   }
 
   const isMatch = await bcrypt.compare(String(password), user.password);

@@ -2,14 +2,14 @@ const crypto = require("crypto");
 const Invitation = require("../models/invitation");
 const User = require("../models/user");
 const { AppError } = require("../errors/AppError");
-const { 
-  toInvitationDTO, 
-  toInvitationSummaryDTO, 
-  toInvitationCreateResponseDTO 
+const {
+  toInvitationDTO,
+  toInvitationSummaryDTO,
+  toInvitationCreateResponseDTO
 } = require("../dtos/invitationDto");
-const { 
-  VALID_INVITATION_ROLES, 
-  INVITATION_EXPIRY_HOURS 
+const {
+  VALID_INVITATION_ROLES,
+  INVITATION_EXPIRY_HOURS
 } = require("../constants");
 const { sendInvitationEmail } = require("./email.service");
 
@@ -38,9 +38,21 @@ async function createInvitation(email, role, createdBy, organization = null) {
     used: false,
     expiresAt: { $gt: new Date() }
   });
-  
+
   if (existingInvitation) {
     throw new AppError(409, "An active invitation already exists for this email.");
+  }
+
+  // CRITICAL FIX: Ensure organization is ALWAYS set.
+  // If not provided explicitly, resolve from the creating user's record.
+  if (!organization) {
+    const creator = await User.findById(createdBy);
+    if (creator && creator.organization) {
+      organization = creator.organization;
+    } else {
+      // Fallback: use createdBy as organization (admin case)
+      organization = createdBy;
+    }
   }
 
   const token = generateSecureToken();
@@ -91,7 +103,7 @@ async function getInvitationByToken(token) {
 
 async function markInvitationAsUsed(token, userEmail) {
   const invitation = await Invitation.findOne({ token });
-  
+
   if (!invitation) {
     throw new AppError(404, "Invitation not found.");
   }
@@ -112,13 +124,13 @@ async function markInvitationAsUsed(token, userEmail) {
 
 async function getInvitationsByCreator(createdBy, filters = {}) {
   const { used, pending } = filters;
-  
+
   let query = { createdBy };
-  
+
   if (used !== undefined) {
     query.used = used;
   }
-  
+
   if (pending === true) {
     query.used = false;
     query.expiresAt = { $gt: new Date() };
