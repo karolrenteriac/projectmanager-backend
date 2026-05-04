@@ -1,47 +1,36 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const mongoose = require("mongoose");
+
 const User = require("../models/user");
 const Invitation = require("../models/invitation");
 const { AppError } = require("../errors/AppError");
-const { toUserDTO } = require("../dtos/userDto");
-const {
-  VALID_REGISTER_ROLES_WITHOUT_INVITATION,
-  VALID_REGISTER_ROLES_WITH_INVITATION,
-  USER_ROLES
-} = require("../constants");
 
 const SALT_ROUNDS = 10;
 const JWT_SECRET = process.env.JWT_SECRET;
 
 async function register(body) {
-  const { name, email, password, token, companyName } = body || {};
+  const { name, email, password, token, companyName } = body;
 
-  if (
-    name === undefined ||
-    email === undefined ||
-    password === undefined ||
-    String(name).trim() === "" ||
-    String(email).trim() === "" ||
-    String(password) === ""
-  ) {
-    throw new AppError(400, "Name, email, and password are required.");
+  if (!name || !email || !password) {
+    throw new AppError(400, "Missing required fields");
   }
 
-  const normalizedEmail = String(email).trim().toLowerCase();
+  const normalizedEmail = email.trim().toLowerCase();
+
   const existingUser = await User.findOne({ email: normalizedEmail });
   if (existingUser) {
-    throw new AppError(409, "User already exists with this email.");
+    throw new AppError(409, "User already exists");
   }
 
-  const hashedPassword = await bcrypt.hash(String(password), SALT_ROUNDS);
+  const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
 
-  let userRole;
+  let user;
+  let role;
   let organization;
 
+  // 🔵 REGISTRO CON INVITACIÓN
   if (token) {
-    // ──────────────────────────────────────────────
-    // INVITED USER FLOW
-    // ──────────────────────────────────────────────
     const invitation = await Invitation.findOne({
       token,
       used: false,
@@ -49,123 +38,86 @@ async function register(body) {
     });
 
     if (!invitation) {
-      throw new AppError(400, "Invalid or expired invitation token.");
+      throw new AppError(400, "Invalid invitation");
     }
 
     if (invitation.email !== normalizedEmail) {
-      throw new AppError(400, "Email does not match invitation email.");
+      throw new AppError(400, "Email does not match invitation");
     }
 
-    userRole = invitation.role;
+    role = invitation.role;
     organization = invitation.organization;
 
-    if (!organization) {
-      // Fallback: use the invitation creator's organization
-      const creator = await User.findById(invitation.createdBy);
-      if (creator && creator.organization) {
-        organization = creator.organization;
-      } else {
-        throw new AppError(400, "Invitation has no valid organization.");
-      }
-    }
-
-    // Create user with organization from invitation
-    const user = await User.create({
-      name: String(name).trim(),
+    user = await User.create({
+      name,
       email: normalizedEmail,
       password: hashedPassword,
-      role: userRole,
-      organization: organization,
+      role,
+      organization
     });
 
-    // Mark invitation as used
     invitation.used = true;
     await invitation.save();
 
-    // Generate JWT
-    if (!JWT_SECRET) {
-      throw new AppError(500, "Server configuration error");
-    }
-
-    const jwtToken = jwt.sign({ userId: user._id.toString() }, JWT_SECRET, {
-      expiresIn: "7d",
-    });
-
-    return { token: jwtToken, user: toUserDTO(user) };
-
   } else {
-    // ──────────────────────────────────────────────
-    // ADMIN SELF-REGISTRATION FLOW
-    // ──────────────────────────────────────────────
-    if (!companyName || String(companyName).trim() === "") {
-      throw new AppError(400, "Company name is required for admin registration.");
+    // 🔴 REGISTRO ADMIN (PRIMER USUARIO)
+    if (!companyName) {
+      throw new AppError(400, "Company name required");
     }
 
-    userRole = USER_ROLES.ADMIN;
-
-    // Create admin user first with a placeholder organization (self-reference)
-    // We use a new ObjectId that we'll assign as the user's _id
-    const mongoose = require("mongoose");
     const userId = new mongoose.Types.ObjectId();
 
-    const user = await User.create({
+    user = await User.create({
       _id: userId,
-      name: String(name).trim(),
+      name,
       email: normalizedEmail,
       password: hashedPassword,
-      role: userRole,
-      organization: userId, // Admin IS the organization anchor
+      role: "admin",
+      organization: userId // 🔥 el admin ES la organización
     });
-
-    // Generate JWT
-    if (!JWT_SECRET) {
-      throw new AppError(500, "Server configuration error");
-    }
-
-    const jwtToken = jwt.sign({ userId: user._id.toString() }, JWT_SECRET, {
-      expiresIn: "7d",
-    });
-
-    return { token: jwtToken, user: toUserDTO(user) };
   }
+
+  const jwtToken = jwt.sign(
+    { userId: user._id.toString() },
+    JWT_SECRET,
+    { expiresIn: "7d" }
+  );
+
+  return {
+    token: jwtToken,
+    user
+  };
 }
 
 async function login(body) {
-  const { email, password } = body || {};
+  const { email, password } = body;
 
-  if (
-    email === undefined ||
-    password === undefined ||
-    String(email).trim() === "" ||
-    String(password) === ""
-  ) {
-    throw new AppError(400, "Email and password are required.");
+  if (!email || !password) {
+    throw new AppError(400, "Missing credentials");
   }
 
-  const normalizedEmail = String(email).trim().toLowerCase();
-  const user = await User.findOne({ email: normalizedEmail });
+  const user = await User.findOne({ email: email.toLowerCase() });
+
   if (!user) {
-    throw new AppError(401, "Invalid email or password.");
+    throw new AppError(401, "Invalid credentials");
   }
 
-  if (user.isDeleted) {
-    throw new AppError(401, "Account has been deactivated.");
-  }
+  const isMatch = await bcrypt.compare(password, user.password);
 
-  const isMatch = await bcrypt.compare(String(password), user.password);
   if (!isMatch) {
-    throw new AppError(401, "Invalid email or password.");
+    throw new AppError(401, "Invalid credentials");
   }
 
-  if (!JWT_SECRET) {
-    throw new AppError(500, "Server configuration error");
-  }
+  const token = jwt.sign(
+    { userId: user._id.toString() },
+    JWT_SECRET,
+    { expiresIn: "7d" }
+  );
 
-  const token = jwt.sign({ userId: user._id.toString() }, JWT_SECRET, {
-    expiresIn: "7d",
-  });
-
-  return { token, user: toUserDTO(user) };
+  return {
+    token,
+    user
+  };
 }
 
 module.exports = { register, login };

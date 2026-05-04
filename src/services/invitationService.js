@@ -2,35 +2,23 @@ const crypto = require("crypto");
 const Invitation = require("../models/invitation");
 const User = require("../models/user");
 const { AppError } = require("../errors/AppError");
-const {
-  toInvitationDTO,
-  toInvitationSummaryDTO,
-  toInvitationCreateResponseDTO
-} = require("../dtos/invitationDto");
-const {
-  VALID_INVITATION_ROLES,
-  INVITATION_EXPIRY_HOURS
-} = require("../constants");
 const { sendInvitationEmail } = require("./email.service");
-
 
 function generateSecureToken() {
   return crypto.randomBytes(32).toString("hex");
 }
 
-async function createInvitation(email, role, createdBy, organization = null) {
+// 🔥 CREAR INVITACIÓN
+async function createInvitation(email, role, createdBy) {
   if (!email || !role || !createdBy) {
-    throw new AppError(400, "Email, role, and createdBy are required.");
+    throw new AppError(400, "Missing required fields");
   }
 
-  const normalizedEmail = String(email).trim().toLowerCase();
-  if (!VALID_INVITATION_ROLES.includes(role)) {
-    throw new AppError(400, `Role must be one of: ${VALID_INVITATION_ROLES.join(", ")}.`);
-  }
+  const normalizedEmail = email.trim().toLowerCase();
 
   const existingUser = await User.findOne({ email: normalizedEmail });
   if (existingUser) {
-    throw new AppError(409, "A user with this email already exists.");
+    throw new AppError(409, "User already exists");
   }
 
   const existingInvitation = await Invitation.findOne({
@@ -40,80 +28,63 @@ async function createInvitation(email, role, createdBy, organization = null) {
   });
 
   if (existingInvitation) {
-    throw new AppError(409, "An active invitation already exists for this email.");
+    throw new AppError(409, "Invitation already exists");
   }
 
-  // CRITICAL FIX: Ensure organization is ALWAYS set.
-  // If not provided explicitly, resolve from the creating user's record.
-  if (!organization) {
-    const creator = await User.findById(createdBy);
-    if (creator && creator.organization) {
-      organization = creator.organization;
-    } else {
-      // Fallback: use createdBy as organization (admin case)
-      organization = createdBy;
-    }
+  const creator = await User.findById(createdBy);
+  if (!creator || !creator.organization) {
+    throw new AppError(400, "Creator has no organization");
   }
 
   const token = generateSecureToken();
+
   const expiresAt = new Date();
-  expiresAt.setHours(expiresAt.getHours() + INVITATION_EXPIRY_HOURS);
+  expiresAt.setHours(expiresAt.getHours() + 24);
 
   const invitation = await Invitation.create({
     email: normalizedEmail,
     role,
     token,
-    organization,
-    expiresAt,
+    organization: creator.organization, // 🔥 CLAVE
     createdBy,
+    expiresAt
   });
 
-  // Send invitation email — failure is logged but must not break invitation creation
-  try {
-    await sendInvitationEmail(normalizedEmail, invitation.token, role);
-  } catch (emailErr) {
-    console.error("❌ Failed to send invitation email (non-critical):", emailErr.message);
-  }
+  await sendInvitationEmail(normalizedEmail, token, role);
 
-  return toInvitationCreateResponseDTO({
-    id: invitation._id,
-    token: invitation.token,
-    invitationLink: `${process.env.FRONTEND_URL || "http://localhost:4200"}/auth/register?token=${invitation.token}`,
-    expiresAt: invitation.expiresAt,
-  });
+  return invitation;
 }
 
+// 🔥 OBTENER INVITACIÓN POR TOKEN
 async function getInvitationByToken(token) {
-  if (!token) {
-    throw new AppError(400, "Token is required.");
-  }
-
   const invitation = await Invitation.findOne({
     token,
     used: false,
     expiresAt: { $gt: new Date() }
-  }).populate('createdBy', 'name email');
+  });
 
   if (!invitation) {
-    throw new AppError(404, "Invalid or expired invitation.");
+    throw new AppError(404, "Invalid invitation");
   }
 
-  return toInvitationDTO(invitation);
+  return invitation;
 }
 
-async function markInvitationAsUsed(token, userEmail) {
+// 🔥 OBTENER INVITACIONES DEL ADMIN (ESTA ES LA QUE FALTABA)
+async function getInvitationsByCreator(createdBy) {
+  const invitations = await Invitation.find({
+    createdBy
+  }).sort({ createdAt: -1 });
+
+  return invitations;
+}
+
+// 🔥 MARCAR COMO USADA
+async function markInvitationAsUsed(token) {
   const invitation = await Invitation.findOne({ token });
 
   if (!invitation) {
-    throw new AppError(404, "Invitation not found.");
-  }
-
-  if (invitation.used) {
-    throw new AppError(400, "Invitation has already been used.");
-  }
-
-  if (invitation.email !== userEmail) {
-    throw new AppError(400, "Email does not match invitation email.");
+    throw new AppError(404, "Invitation not found");
   }
 
   invitation.used = true;
@@ -122,30 +93,9 @@ async function markInvitationAsUsed(token, userEmail) {
   return invitation;
 }
 
-async function getInvitationsByCreator(createdBy, filters = {}) {
-  const { used, pending } = filters;
-
-  let query = { createdBy };
-
-  if (used !== undefined) {
-    query.used = used;
-  }
-
-  if (pending === true) {
-    query.used = false;
-    query.expiresAt = { $gt: new Date() };
-  }
-
-  const invitations = await Invitation.find(query)
-    .populate('createdBy', 'name email')
-    .sort({ createdAt: -1 });
-
-  return invitations.map(inv => toInvitationSummaryDTO(inv));
-}
-
 module.exports = {
   createInvitation,
   getInvitationByToken,
-  markInvitationAsUsed,
-  getInvitationsByCreator,
+  getInvitationsByCreator, // 🔥 ESTA FALTABA
+  markInvitationAsUsed
 };

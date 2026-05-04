@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const Project = require("../models/project");
 const ProjectMember = require("../models/projectMember");
+const Task = require("../models/Task");
 const User = require("../models/user");
 const { AppError } = require("../errors/AppError");
 const { toProjectDTO } = require("../dtos/projectDto");
@@ -37,6 +38,10 @@ function validateMembers(members) {
 }
 
 async function createProject(body, actor) {
+  if (!actor) {
+    throw new AppError(401, "User is not authenticated");
+  }
+
   assertCanCreateProject(actor);
 
   const { title, description, objectives, startDate, endDate, status, members, role } = body || {};
@@ -48,7 +53,7 @@ async function createProject(body, actor) {
   // Ensure organization exists
   if (!actor.organization) {
     // Attempt rescue from DB if missing on actor
-    const user = await User.findById(actor.userId);
+    const user = await User.findById(actor.userId || actor.id);
     if (!user || !user.organization) {
       throw new AppError(400, "User must belong to an organization to create projects");
     }
@@ -56,6 +61,17 @@ async function createProject(body, actor) {
   }
 
   const cleanedMembers = validateMembers(members);
+
+  if (cleanedMembers.length > 0) {
+    const users = await User.find({
+      _id: { $in: cleanedMembers },
+      organization: actor.organization
+    });
+
+    if (users.length !== cleanedMembers.length) {
+      throw new AppError(400, "Some members do not belong to your organization");
+    }
+  }
 
   const project = await Project.create({
     title: String(title).trim(),
@@ -113,17 +129,33 @@ async function createProject(body, actor) {
   return toProjectDTO(project);
 }
 
-async function getProjects(actor) {
+/**
+ * GET ALL PROJECTS with optional search filter
+ * Filters by title and description using regex
+ * Multi-tenant: always scoped to actor's organization
+ */
+async function getProjects(actor, search) {
   if (!actor.organization) {
     throw new AppError(400, "Organization context missing");
   }
 
+  const baseFilter = {
+    organization: actor.organization,
+    isDeleted: false,
+  };
+
+  // Apply search filter on title and description
+  if (search && String(search).trim() !== "") {
+    const sanitized = String(search).trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    baseFilter.$or = [
+      { title: { $regex: sanitized, $options: "i" } },
+      { description: { $regex: sanitized, $options: "i" } },
+    ];
+  }
+
   let projects;
   if (actor.role === "admin") {
-    projects = await Project.find({ 
-      organization: actor.organization,
-      isDeleted: false 
-    })
+    projects = await Project.find(baseFilter)
       .populate(populateOptions)
       .sort({ updatedAt: -1 });
   } else {
@@ -135,9 +167,8 @@ async function getProjects(actor) {
     }).distinct("project");
     
     projects = await Project.find({
+      ...baseFilter,
       _id: { $in: myProjectIds },
-      organization: actor.organization,
-      isDeleted: false,
     })
       .populate(populateOptions)
       .sort({ updatedAt: -1 });
@@ -278,10 +309,93 @@ async function softDeleteProject(projectId, actor) {
   return { message: "Project deleted successfully" };
 }
 
+/**
+ * EXPORT PROJECT
+ * Returns full project data with tasks and members for download
+ * Multi-tenant: scoped to actor's organization
+ */
+async function exportProject(projectId, actor) {
+  if (!isValidObjectId(projectId)) {
+    throw new AppError(400, "Invalid project ID");
+  }
+
+  const project = await Project.findOne({
+    _id: projectId,
+    organization: actor.organization,
+    isDeleted: false,
+  }).populate(populateOptions);
+
+  if (!project) {
+    throw new AppError(404, "Project not found");
+  }
+
+  // Check access
+  const isMember = await ProjectMember.exists({
+    user: actor.userId,
+    project: projectId,
+    isDeleted: false,
+  });
+
+  if (actor.role !== "admin" && !isMember) {
+    throw new AppError(403, "You do not have access to this project");
+  }
+
+  // Fetch associated tasks
+  const tasks = await Task.find({
+    project: projectId,
+    organization: actor.organization,
+    isDeleted: false,
+  })
+    .populate({ path: "assignedTo", select: "name email role" })
+    .populate({ path: "createdBy", select: "name email role" })
+    .sort({ createdAt: -1 });
+
+  // Fetch project members with roles
+  const members = await ProjectMember.find({
+    project: projectId,
+    organization: actor.organization,
+    isDeleted: false,
+  }).populate({ path: "user", select: "name email role" });
+
+  const projectDTO = toProjectDTO(project);
+
+  return {
+    project: projectDTO,
+    tasks: tasks.map((t) => {
+      const task = t.toObject ? t.toObject() : t;
+      return {
+        id: task._id?.toString(),
+        title: task.title,
+        description: task.description,
+        status: task.status,
+        assignedTo: task.assignedTo
+          ? { name: task.assignedTo.name, email: task.assignedTo.email }
+          : null,
+        createdBy: task.createdBy
+          ? { name: task.createdBy.name, email: task.createdBy.email }
+          : null,
+        createdAt: task.createdAt,
+        updatedAt: task.updatedAt,
+      };
+    }),
+    members: members.map((m) => {
+      const member = m.toObject ? m.toObject() : m;
+      return {
+        name: member.user?.name,
+        email: member.user?.email,
+        role: member.role,
+        joinedAt: member.joinedAt,
+      };
+    }),
+    exportedAt: new Date().toISOString(),
+  };
+}
+
 module.exports = {
   createProject,
   getProjects,
   getProjectById,
   updateProject,
   softDeleteProject,
+  exportProject,
 };

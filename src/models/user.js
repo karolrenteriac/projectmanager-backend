@@ -5,37 +5,40 @@ const userSchema = new mongoose.Schema(
     name: {
       type: String,
       required: true,
+      trim: true
     },
     email: {
       type: String,
       required: true,
+      lowercase: true,
+      trim: true
     },
     password: {
       type: String,
-      required: true,
+      required: true
     },
     role: {
       type: String,
       enum: ["admin", "coordinator", "principal", "co-researcher"],
-      default: "co-researcher",
+      default: "co-researcher"
     },
+
+    // 🔥 SIEMPRE OBLIGATORIO
     organization: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Organization",
-      required: true,
+      ref: "User", // usamos el admin como organización (tu diseño actual)
+      required: true
     },
+
     isDeleted: {
       type: Boolean,
-      default: false,
-    },
+      default: false
+    }
   },
   { timestamps: true }
 );
 
+// 🔥 evitar duplicados por empresa
 userSchema.index({ organization: 1, email: 1 }, { unique: true });
-userSchema.index({ organization: 1 });
-userSchema.index({ isDeleted: 1 });
-userSchema.index({ createdAt: -1 });
-userSchema.index({ name: "text", email: "text" });
 
 module.exports = mongoose.models.User || mongoose.model("User", userSchema);
