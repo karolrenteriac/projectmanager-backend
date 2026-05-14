@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const Task = require("../models/task");
 const Project = require("../models/project");
 
@@ -7,13 +8,17 @@ const Project = require("../models/project");
  * @returns {Promise<number>} - Porcentaje de progreso (0-100)
  */
 async function updateProjectProgress(projectId) {
+  const pId = projectId?._id || projectId;
+  if (!pId || !mongoose.Types.ObjectId.isValid(String(pId))) {
+    return 0;
+  }
   try {
     // Contar tareas totales y completadas
     const [totalTasks, completedTasks] = await Promise.all([
-      Task.countDocuments({ project: projectId, isDeleted: false }),
+      Task.countDocuments({ project: pId, isDeleted: false }),
       Task.countDocuments({ 
-        project: projectId, 
-        status: "completed", 
+        project: pId, 
+        status: "done", 
         isDeleted: false 
       })
     ]);
@@ -22,7 +27,7 @@ async function updateProjectProgress(projectId) {
     const progress = totalTasks === 0 ? 0 : Math.round((completedTasks / totalTasks) * 100);
 
     // Actualizar proyecto
-    await Project.findByIdAndUpdate(projectId, { progress });
+    await Project.findByIdAndUpdate(pId, { progress });
 
     return progress;
   } catch (error) {

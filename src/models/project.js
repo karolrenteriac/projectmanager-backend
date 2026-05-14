@@ -39,7 +39,18 @@ const projectSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
-    members: [
+    projectCoordinator: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+    principalResearchers: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
+    coResearchers: [
       {
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",
@@ -55,7 +66,9 @@ const projectSchema = new mongoose.Schema(
 
 projectSchema.index({ organization: 1 });
 projectSchema.index({ createdBy: 1 });
-projectSchema.index({ members: 1 });
+projectSchema.index({ projectCoordinator: 1 });
+projectSchema.index({ principalResearchers: 1 });
+projectSchema.index({ coResearchers: 1 });
 projectSchema.index({ status: 1 });
 projectSchema.index({ isDeleted: 1 });
 projectSchema.index({ createdAt: -1 });

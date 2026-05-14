@@ -30,15 +30,21 @@ const userSchema = new mongoose.Schema(
       required: true
     },
 
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
     isDeleted: {
       type: Boolean,
-      default: false
-    }
+      default: false,
+    },
   },
   { timestamps: true }
 );
 
-// 🔥 evitar duplicados por empresa
+// evitar duplicados por empresa
 userSchema.index({ organization: 1, email: 1 }, { unique: true });
+userSchema.index({ organization: 1, isActive: 1 });
+userSchema.index({ organization: 1, role: 1 });
 
 module.exports = mongoose.models.User || mongoose.model("User", userSchema);

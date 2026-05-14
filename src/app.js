@@ -1,5 +1,6 @@
 const express = require("express");
 const cors = require("cors");
+const path = require("path");
 
 const app = express();
 
@@ -7,6 +8,9 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Serve uploaded evidence files statically
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Routes Registration
 const authRoutes = require("./routers/authRouters"); // Authentication
@@ -48,6 +52,9 @@ app.use("/api/search", searchRoutes);
 const documentsRoutes = require("./routes/documentsRoutes"); // File Management
 app.use("/api/documents", documentsRoutes);
 
+const adminGovernanceRoutes = require("./routes/adminGovernanceRoutes"); // Admin Governance
+app.use("/api/admin/projects", adminGovernanceRoutes);
+
 // Test route
 app.get("/api/test", (req, res) => {
   res.json({ message: "API working" });
@@ -60,17 +67,44 @@ app.use((req, res) => {
 
 // Global Error handler
 app.use((err, req, res, next) => {
-  console.error("GLOBAL ERROR HANDLER:", err);
+  console.error("❌ GLOBAL ERROR HANDLER:", err.message || err);
 
+  // Handle ValidationError
   if (err.name === "ValidationError") {
-    return res.status(400).json({ message: err.message });
+    return res.status(400).json({ 
+      success: false,
+      message: err.message 
+    });
   }
 
+  // Handle CastError (invalid MongoDB ID)
   if (err.name === "CastError") {
-    return res.status(400).json({ message: "Invalid ID format" });
+    return res.status(400).json({ 
+      success: false,
+      message: "Invalid ID format" 
+    });
   }
 
+  // Handle MongoError (duplicate key, etc)
+  if (err.code === 11000) {
+    const field = Object.keys(err.keyPattern)[0];
+    return res.status(400).json({ 
+      success: false,
+      message: `Duplicate value for field: ${field}` 
+    });
+  }
+
+  // Handle AppError (custom errors with statusCode)
+  if (err.statusCode) {
+    return res.status(err.statusCode).json({ 
+      success: false,
+      message: err.message 
+    });
+  }
+
+  // Default error response
   res.status(err.status || 500).json({ 
+    success: false,
     message: err.message || "Internal server error" 
   });
 });

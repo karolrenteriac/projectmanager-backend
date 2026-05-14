@@ -63,6 +63,13 @@ const protect = async (req, res, next) => {
     if (user.isDeleted) {
       return res.status(401).json({
         success: false,
+        message: "Unauthorized: User account has been deleted",
+      });
+    }
+
+    if (user.isActive === false) {
+      return res.status(401).json({
+        success: false,
         message: "Unauthorized: User account is deactivated",
       });
     }

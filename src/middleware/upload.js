@@ -18,23 +18,26 @@ const storage = multer.diskStorage({
   }
 });
 
-const fileFilter = (req, file, cb) => {
-  const allowedMimes = [
-    'application/pdf',
-    'application/msword',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    'application/vnd.ms-excel',
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    'text/plain',
-    'image/jpeg',
-    'image/png',
-    'image/gif'
-  ];
+const ALLOWED_MIMES = [
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'text/plain',
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'application/zip',
+  'application/x-zip-compressed',
+  'application/x-zip',
+];
 
-  if (allowedMimes.includes(file.mimetype)) {
+const fileFilter = (req, file, cb) => {
+  if (ALLOWED_MIMES.includes(file.mimetype)) {
     cb(null, true);
   } else {
-    cb(new Error('Invalid file type. Only PDF, Word, Excel, text files and images are allowed.'), false);
+    cb(new Error('Invalid file type. Allowed: PDF, Word, Excel, images (JPG/PNG/GIF), ZIP, plain text.'), false);
   }
 };
 
@@ -42,12 +45,14 @@ const upload = multer({
   storage,
   fileFilter,
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB limit
+    fileSize: 25 * 1024 * 1024, // 25MB per file
   }
 });
 
 module.exports = {
   upload,
-  uploadSingle: upload.single('file'),
+  uploadSingle:   upload.single('file'),
   uploadMultiple: upload.array('files', 5),
+  uploadEvidence: upload.array('files', 10),
+  ALLOWED_MIMES,
 };

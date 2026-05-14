@@ -1,5 +1,6 @@
 const express = require("express");
 const { protect } = require("../middleware/authMiddleware");
+const { strictRoleMiddleware } = require("../middleware/roleMiddleware");
 const {
   createProject,
   getProjects,
@@ -9,15 +10,21 @@ const {
   exportProject,
 } = require("../controllers/projectController");
 
-const roleMiddleware = require("../middleware/roleMiddleware");
-
 const router = express.Router();
 
-router.post("/", protect, roleMiddleware(["admin", "coordinator"]), createProject);
-router.get("/", protect, getProjects);
-router.get("/:id/export", protect, exportProject);
-router.get("/:id", protect, getProjectById);
-router.put("/:id", protect, updateProject);
-router.delete("/:id", protect, softDeleteProject);
+// All project routes require authentication
+router.use(protect);
+
+// ── Project Visibility (role-based filtering inside service) ───────────────
+router.get("/", getProjects);
+router.get("/:id", getProjectById);
+
+// ── Export (admin + coordinator only — enforced in service) ────────────────
+router.get("/:id/export", exportProject);
+
+// ── Admin-only mutations ───────────────────────────────────────────────────
+router.post(   "/",    strictRoleMiddleware(["admin"]), createProject);
+router.put(    "/:id", strictRoleMiddleware(["admin"]), updateProject);
+router.delete( "/:id", strictRoleMiddleware(["admin"]), softDeleteProject);
 
 module.exports = router;

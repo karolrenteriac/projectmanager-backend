@@ -7,7 +7,7 @@ const { handleError } = require("../utils/handleError");
 exports.createProject = async (req, res, next) => {
   try {
     const project = await projectService.createProject(req.body, req.user);
-    return res.status(201).json(project); // ✅ limpio
+    return res.status(201).json({ project }); // ✅ wrapped
   } catch (error) {
     handleError(error, res, next);
   }
@@ -32,7 +32,7 @@ exports.getProjects = async (req, res, next) => {
 exports.getProjectById = async (req, res, next) => {
   try {
     const project = await projectService.getProjectById(req.params.id, req.user);
-    res.json(project); // ✅ SIN wrapper { project }
+    res.json({ project }); // ✅ wrapped
   } catch (error) {
     handleError(error, res, next);
   }
@@ -44,7 +44,7 @@ exports.getProjectById = async (req, res, next) => {
 exports.updateProject = async (req, res, next) => {
   try {
     const project = await projectService.updateProject(req.params.id, req.body, req.user);
-    res.json(project); // ✅ limpio
+    res.json({ project }); // ✅ wrapped
   } catch (error) {
     handleError(error, res, next);
   }

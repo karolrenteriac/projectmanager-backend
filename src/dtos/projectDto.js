@@ -18,7 +18,13 @@ function toProjectDTO(project) {
     progress: p.progress || 0,
     organization: p.organization,
     createdBy: toUserDTO(p.createdBy),
-    members: Array.isArray(p.members) ? p.members.map((m) => toUserDTO(m)) : [],
+    projectCoordinator: toUserDTO(p.projectCoordinator),
+    principalResearchers: Array.isArray(p.principalResearchers)
+      ? p.principalResearchers.map((m) => toUserDTO(m))
+      : [],
+    coResearchers: Array.isArray(p.coResearchers)
+      ? p.coResearchers.map((m) => toUserDTO(m))
+      : [],
     isDeleted: p.isDeleted || false,
     createdAt: p.createdAt,
     updatedAt: p.updatedAt,

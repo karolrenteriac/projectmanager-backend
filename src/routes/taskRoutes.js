@@ -1,33 +1,55 @@
 const express = require("express");
-const router = express.Router();
-
 const { protect } = require("../middleware/authMiddleware");
+const { strictRoleMiddleware } = require("../middleware/roleMiddleware");
+const { uploadEvidence: evidenceMiddleware } = require("../middleware/upload");
 const {
   createTask,
-  getTasks,
+  getTasksByProject,
   getTaskById,
   updateTask,
-  deleteTask
+  updateTaskStatus,
+  submitForReview,
+  reviewTask,
+  addComment,
+  deleteTask,
+  uploadEvidence,
+  deleteEvidence,
 } = require("../controllers/taskController");
 
-/**
- * ROUTES FOR /api/tasks
- * All routes are protected by JWT authentication
- */
+const router = express.Router();
 
-// POST /api/tasks - Create a new task
-router.post("/", protect, createTask);
+// All task routes require authentication
+router.use(protect);
 
-// GET /api/tasks?projectId=XXX - Get tasks for a specific project
-router.get("/", protect, getTasks);
+// ── Read (all authenticated roles with project access) ─────────────────────
+router.get("/project/:projectId", getTasksByProject);
+router.get("/:id",                getTaskById);
 
-// GET /api/tasks/:id - Get a single task by ID
-router.get("/:id", protect, getTaskById);
+// ── Coordinator-only task management ──────────────────────────────────────
+router.post(   "/",           strictRoleMiddleware(["coordinator"]), createTask);
+router.put(    "/:id",        updateTask);          // Role enforced in service (coordinator full-edit; workers checklist-only)
+router.patch(  "/:id/status", updateTaskStatus);    // Role enforced in service (coordinator any; workers todo→in-progress only)
+router.delete( "/:id",        strictRoleMiddleware(["coordinator"]), deleteTask);
+router.patch(  "/:id/review", strictRoleMiddleware(["coordinator"]), reviewTask);
 
-// PUT /api/tasks/:id - Update task status/details
-router.put("/:id", protect, updateTask);
+// ── Worker-only workflow ───────────────────────────────────────────────────
+router.patch("/:id/submit", strictRoleMiddleware(["principal", "co-researcher"]), submitForReview);
 
-// DELETE /api/tasks/:id - Soft delete a task
-router.delete("/:id", protect, deleteTask);
+// ── Comments (coordinator + workers; admin blocked in service) ─────────────
+router.post("/:id/comments", addComment);
+
+// ── Evidence — upload (workers only) and delete (workers + coordinator) ────
+router.post("/:id/evidence",
+  strictRoleMiddleware(["principal", "co-researcher"]),
+  (req, res, next) => {
+    evidenceMiddleware(req, res, (err) => {
+      if (err) return res.status(400).json({ message: err.message });
+      next();
+    });
+  },
+  uploadEvidence
+);
+
+router.delete("/:id/evidence/:evidenceId", deleteEvidence);
 
 module.exports = router;

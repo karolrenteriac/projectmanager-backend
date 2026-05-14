@@ -1,95 +1,104 @@
 const taskService = require("../services/taskService");
 const { handleError } = require("../utils/handleError");
 
-/**
- * ✅ CREATE TASK
- */
-const createTask = async (req, res, next) => {
+exports.createTask = async (req, res, next) => {
   try {
     const task = await taskService.createTask(req.body, req.user);
-    return res.status(201).json({
-      message: "Task created successfully",
-      task,
-    });
+    res.status(201).json({ task });
   } catch (err) {
     handleError(err, res, next);
   }
 };
 
-/**
- * ✅ GET TASKS (By Project usually)
- */
-const getTasks = async (req, res, next) => {
+exports.getTasksByProject = async (req, res, next) => {
   try {
-    // If projectId is in query or body
-    const projectId = req.query.projectId || req.body.projectId;
-    if (!projectId) {
-      return res.status(400).json({ message: "projectId is required as a query parameter" });
-    }
-    const tasks = await taskService.getTasksByProject(projectId, req.user);
-    return res.json({ tasks });
+    const { projectId } = req.params;
+    const tasks = await taskService.getTasksByProject(projectId, req.user, req.query);
+    res.json({ tasks });
   } catch (err) {
     handleError(err, res, next);
   }
 };
 
-/**
- * ✅ GET TASK BY ID
- * Note: If standard service doesn't have it, we implement basic logic or call getTasksByProject filter
- */
-const getTaskById = async (req, res, next) => {
+exports.getTaskById = async (req, res, next) => {
   try {
     const task = await taskService.getTaskById(req.params.id, req.user);
-    return res.json({ task });
+    res.json({ task });
   } catch (err) {
     handleError(err, res, next);
   }
 };
 
-/**
- * ✅ UPDATE TASK STATUS
- */
-const updateTask = async (req, res, next) => {
+exports.updateTask = async (req, res, next) => {
   try {
-    const task = await taskService.updateTaskStatus(
-      req.params.id,
-      req.body,
-      req.user
-    );
-    return res.json({
-      message: "Task updated successfully",
-      task,
-    });
+    const task = await taskService.updateTask(req.params.id, req.body, req.user);
+    res.json({ task });
   } catch (err) {
     handleError(err, res, next);
   }
 };
 
-/**
- * ✅ DELETE TASK (SOFT)
- */
-const deleteTask = async (req, res, next) => {
+exports.updateTaskStatus = async (req, res, next) => {
   try {
-    const result = await taskService.softDeleteTask(
-      req.params.id,
-      req.user
-    );
-    return res.json({
-      message: result.message,
-    });
+    const { status } = req.body;
+    const task = await taskService.updateTask(req.params.id, { status }, req.user);
+    res.json({ task });
   } catch (err) {
     handleError(err, res, next);
   }
 };
 
-module.exports = {
-  createTask,
-  getTasks,
-  getTaskById,
-  updateTask,
-  deleteTask,
-  // Keep original names for backward compatibility if any
-  getTasksByProject: getTasks,
-  updateTaskStatus: updateTask,
-  softDeleteTask: deleteTask
+exports.submitForReview = async (req, res, next) => {
+  try {
+    const task = await taskService.submitForReview(req.params.id, req.body, req.user);
+    res.json({ task });
+  } catch (err) {
+    handleError(err, res, next);
+  }
+};
+
+exports.reviewTask = async (req, res, next) => {
+  try {
+    const task = await taskService.reviewTask(req.params.id, req.body, req.user);
+    res.json({ task });
+  } catch (err) {
+    handleError(err, res, next);
+  }
+};
+
+exports.addComment = async (req, res, next) => {
+  try {
+    const { content } = req.body;
+    const task = await taskService.addComment(req.params.id, content, req.user);
+    res.json({ task });
+  } catch (err) {
+    handleError(err, res, next);
+  }
+};
+
+exports.deleteTask = async (req, res, next) => {
+  try {
+    const result = await taskService.softDeleteTask(req.params.id, req.user);
+    res.json(result);
+  } catch (err) {
+    handleError(err, res, next);
+  }
+};
+
+exports.uploadEvidence = async (req, res, next) => {
+  try {
+    const task = await taskService.uploadEvidence(req.params.id, req.files || [], req.user);
+    res.status(200).json({ task, uploaded: req.files?.length || 0 });
+  } catch (err) {
+    handleError(err, res, next);
+  }
+};
+
+exports.deleteEvidence = async (req, res, next) => {
+  try {
+    const task = await taskService.deleteEvidence(req.params.id, req.params.evidenceId, req.user);
+    res.json({ task });
+  } catch (err) {
+    handleError(err, res, next);
+  }
 };
