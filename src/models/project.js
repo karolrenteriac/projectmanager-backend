@@ -39,7 +39,7 @@ const projectSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
-    projectCoordinator: {
+    coordinator: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       default: null,
@@ -66,7 +66,7 @@ const projectSchema = new mongoose.Schema(
 
 projectSchema.index({ organization: 1 });
 projectSchema.index({ createdBy: 1 });
-projectSchema.index({ projectCoordinator: 1 });
+projectSchema.index({ coordinator: 1 });
 projectSchema.index({ principalResearchers: 1 });
 projectSchema.index({ coResearchers: 1 });
 projectSchema.index({ status: 1 });

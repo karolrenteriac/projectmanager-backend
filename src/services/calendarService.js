@@ -52,7 +52,7 @@ async function createEvent(title, description, startDate, endDate, projectId, ta
 
   return await Event.findById(event._id)
     .populate('createdBy', 'name email')
-    .populate('project', 'name')
+    .populate({ path: 'project', select: 'name', match: { isDeleted: false } })
     .populate('task', 'title')
     .populate('participants', 'name email');
 }
@@ -92,7 +92,7 @@ async function getEvents(userId, page = 1, limit = 20, filters = {}) {
 
   const events = await Event.find(query)
     .populate('createdBy', 'name email')
-    .populate('project', 'name')
+    .populate({ path: 'project', select: 'name', match: { isDeleted: false } })
     .populate('task', 'title')
     .populate('participants', 'name email')
     .sort({ startDate: 1 })
@@ -111,7 +111,7 @@ async function getEventById(eventId, userId) {
 
   const event = await Event.findById(eventId)
     .populate('createdBy', 'name email')
-    .populate('project', 'name members createdBy')
+    .populate({ path: 'project', select: 'name members createdBy', match: { isDeleted: false } })
     .populate('task', 'title')
     .populate('participants', 'name email');
 
@@ -172,7 +172,7 @@ async function updateEvent(eventId, userId, updates) {
     updateData,
     { new: true, runValidators: true }
   ).populate('createdBy', 'name email')
-   .populate('project', 'name')
+   .populate({ path: 'project', select: 'name', match: { isDeleted: false } })
    .populate('task', 'title')
    .populate('participants', 'name email');
 

@@ -10,6 +10,55 @@ function _checklistStats(checklist) {
 }
 
 /**
+ * Format a single version for DTO
+ */
+function _formatVersion(version) {
+  if (!version) return null;
+  const v = version.toObject ? version.toObject() : version;
+  return {
+    id: v._id?.toString(),
+    versionNumber: v.versionNumber,
+    fileUrl: v.fileUrl,
+    filename: v.filename,
+    originalName: v.originalName,
+    mimeType: v.mimeType,
+    size: v.size,
+    uploadedBy: toUserDTO(v.uploadedBy),
+    uploadedAt: v.uploadedAt,
+    status: v.status,
+    reviewedBy: toUserDTO(v.reviewedBy),
+    reviewDate: v.reviewDate,
+    reviewFeedback: v.reviewFeedback,
+    rejectedBy: toUserDTO(v.rejectedBy),
+    rejectionReason: v.rejectionReason,
+    rejectedAt: v.rejectedAt,
+    approvedBy: toUserDTO(v.approvedBy),
+    approvedAt: v.approvedAt,
+    changeReason: v.changeReason,
+  };
+}
+
+/**
+ * Format a deliverable attachment for DTO
+ */
+function _formatDeliverable(deliverable) {
+  if (!deliverable) return null;
+  const d = deliverable.toObject ? deliverable.toObject() : deliverable;
+  return {
+    id: d._id?.toString(),
+    title: d.title,
+    description: d.description,
+    currentVersionNumber: d.currentVersionNumber,
+    status: d.status,
+    uploadedBy: toUserDTO(d.uploadedBy),
+    createdAt: d.createdAt,
+    updatedAt: d.updatedAt,
+    versions: (d.versions || []).map(_formatVersion),
+    latestVersion: _formatVersion(d.latestVersion),
+  };
+}
+
+/**
  * @param {import("mongoose").Document | Record<string, unknown> | null | undefined} task
  */
 function toTaskDTO(task) {
@@ -63,6 +112,9 @@ function toTaskDTO(task) {
       description: att.description,
       fileUrl: att.fileUrl,
     })),
+
+    // Versioned Deliverables (research workflow)
+    deliverables: (t.deliverables || []).map(_formatDeliverable),
 
     // Comments
     comments: (t.comments || []).map(com => ({

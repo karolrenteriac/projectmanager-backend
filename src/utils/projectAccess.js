@@ -12,7 +12,10 @@ const userOwnsProject = (project, userIdStr) =>
 
 const userCanAccessProject = (project, userIdStr) => {
   if (userOwnsProject(project, userIdStr)) return true;
-  return project.members.some((m) => refIdString(m) === userIdStr);
+  if (project.coordinator && refIdString(project.coordinator) === userIdStr) return true;
+  if (project.principalResearchers?.some((m) => refIdString(m) === userIdStr)) return true;
+  if (project.coResearchers?.some((m) => refIdString(m) === userIdStr)) return true;
+  return false;
 };
 
 /**
@@ -20,8 +23,8 @@ const userCanAccessProject = (project, userIdStr) => {
  * under the new role architecture:
  *
  *   admin       → always (org-scoped read-only oversight)
- *   coordinator → only if project.projectCoordinator === actor.userId
- *   principal / co-researcher → only if in project.members[]
+ *   coordinator → only if project.coordinator === actor.userId
+ *   principal / co-researcher → only if in project.principalResearchers[] or project.coResearchers[]
  */
 function isProjectMember(userIdStr, project, user) {
   if (!project) return false;
@@ -31,13 +34,15 @@ function isProjectMember(userIdStr, project, user) {
 
   if (user.role === "coordinator") {
     return (
-      project.projectCoordinator &&
-      refIdString(project.projectCoordinator) === String(userIdStr)
+      project.coordinator &&
+      refIdString(project.coordinator) === String(userIdStr)
     );
   }
 
   // principal / co-researcher
-  return project.members.some((m) => refIdString(m) === String(userIdStr));
+  if (project.principalResearchers?.some((m) => refIdString(m) === String(userIdStr))) return true;
+  if (project.coResearchers?.some((m) => refIdString(m) === String(userIdStr))) return true;
+  return false;
 }
 
 /**

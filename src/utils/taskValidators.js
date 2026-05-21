@@ -27,12 +27,14 @@ function validateEstimatedHours(hours) {
 }
 
 // All transitions a coordinator can make
+// All allowed workflow transitions
 const ALLOWED_TRANSITIONS = {
-  todo: ["in-progress", "blocked", "cancelled"],
-  "in-progress": ["review", "blocked", "cancelled"],
-  review: ["done", "in-progress", "blocked", "cancelled"],
-  done: ["in-progress", "blocked", "cancelled"],
-  blocked: ["in-progress", "todo", "cancelled"],
+  todo: ["in-progress"],
+  "in-progress": ["review"],
+  review: ["done", "changes-requested"],
+  "changes-requested": ["in-progress", "review"],
+  done: [],
+  blocked: ["in-progress", "todo"],
   cancelled: ["todo"],
 };
 

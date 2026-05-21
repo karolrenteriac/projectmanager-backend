@@ -14,7 +14,9 @@ const {
 router.get("/", protect, getUsers);
 
 // ── Admin-only User Management ─────────────────────────────────────────────
+// /admin and /admin/list both serve the paginated user list
 // /admin/list must be registered BEFORE /admin/:id to avoid "list" matching :id
+router.get(   "/admin",            protect, strictRoleMiddleware(["admin"]), adminGetUsers);
 router.get(   "/admin/list",       protect, strictRoleMiddleware(["admin"]), adminGetUsers);
 router.get(   "/admin/:id",        protect, strictRoleMiddleware(["admin"]), adminGetUserById);
 router.patch( "/admin/:id/role",   protect, strictRoleMiddleware(["admin"]), adminUpdateUserRole);

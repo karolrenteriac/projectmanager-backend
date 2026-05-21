@@ -49,7 +49,7 @@ const taskSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["todo", "in-progress", "review", "done", "blocked", "cancelled"],
+      enum: ["todo", "in-progress", "review", "done", "blocked", "cancelled", "changes-requested"],
       default: "todo",
     },
     priority: {
@@ -83,6 +83,16 @@ const taskSchema = new mongoose.Schema(
     checklist: [checklistItemSchema],
     estimatedHours: { type: Number, min: 1, max: 1000, default: null },
     attachments: [attachmentSchema],
+    
+    // ─── Versioned deliverables (research workflow) ────────────────────────
+    // Each deliverable attachment tracks versions, reviews, and feedback
+    deliverables: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "TaskAttachment",
+      },
+    ],
+    
     comments: [commentSchema],
     
     // Review System — latest decision (convenience fields)
@@ -116,5 +126,6 @@ taskSchema.index({ project: 1, status: 1, isDeleted: 1 }); // Kanban sorting
 taskSchema.index({ project: 1, priority: 1, isDeleted: 1 });
 taskSchema.index({ project: 1, dueDate: 1, isDeleted: 1 });
 taskSchema.index({ title: "text", description: "text" });
+taskSchema.index({ deliverables: 1 }); // For tasks with deliverables
 
 module.exports = mongoose.models.Task || mongoose.model("Task", taskSchema);

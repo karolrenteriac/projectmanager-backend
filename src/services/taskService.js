@@ -32,6 +32,31 @@ const populateOptions = [
   { path: "reviewedBy", select: "name email" },
   { path: "reviewHistory.reviewedBy", select: "name email" },
   { path: "reviewHistory.rejectedBy", select: "name email" },
+  // Versioned deliverables with full population
+  {
+    path: "deliverables",
+    populate: [
+      { path: "uploadedBy", select: "name email" },
+      {
+        path: "versions",
+        populate: [
+          { path: "uploadedBy", select: "name email" },
+          { path: "reviewedBy", select: "name email" },
+          { path: "rejectedBy", select: "name email" },
+          { path: "approvedBy", select: "name email" },
+        ],
+      },
+      {
+        path: "latestVersion",
+        populate: [
+          { path: "uploadedBy", select: "name email" },
+          { path: "reviewedBy", select: "name email" },
+          { path: "rejectedBy", select: "name email" },
+          { path: "approvedBy", select: "name email" },
+        ],
+      },
+    ],
+  },
 ];
 
 // ─── Centralised Permission Helpers ───────────────────────────────────────
@@ -50,7 +75,7 @@ function assertCanManageTasks(actor) {
  * Asserts the actor is a worker (principal / co-researcher)
  * AND is the assignee of the task.
  */
-function assertCanExecuteTask(actor, task) {
+async function assertCanExecuteTask(actor, task) {
   if (!WORKER_ROLES.includes(actor.role)) {
     throw new AppError(
       403,
@@ -59,9 +84,19 @@ function assertCanExecuteTask(actor, task) {
   }
   const isAssigned =
     task.assignedTo && String(task.assignedTo) === String(actor.userId);
-  if (!isAssigned) {
-    throw new AppError(403, "You can only interact with tasks assigned to you");
+  if (isAssigned) return;
+
+  if (actor.role === "principal") {
+    const Project = require("../models/project");
+    const project = await Project.findOne({
+      _id: task.project,
+      principalResearchers: actor.userId,
+      isDeleted: false,
+    });
+    if (project) return;
   }
+
+  throw new AppError(403, "You can only interact with tasks assigned to you");
 }
 
 /**
@@ -114,7 +149,11 @@ async function validateAssignment(userId, projectId, organization) {
 
   const [user, isMember] = await Promise.all([
     User.findOne({ _id: userId, organization, isDeleted: false }),
-    Project.exists({ _id: projectId, members: userId, isDeleted: false }),
+    Project.exists({ 
+      _id: projectId, 
+      $or: [{ principalResearchers: userId }, { coResearchers: userId }], 
+      isDeleted: false 
+    }),
   ]);
 
   if (!user) throw new AppError(400, "Assigned user not found in your organization");
@@ -233,7 +272,17 @@ async function updateTask(taskId, body, actor) {
   if (isWorker) {
     // Workers may only update their own tasks
     const isAssigned = task.assignedTo && String(task.assignedTo) === String(actor.userId);
-    if (!isAssigned) {
+    let isLead = false;
+    if (actor.role === "principal") {
+      const Project = require("../models/project");
+      const project = await Project.findOne({
+        _id: task.project,
+        principalResearchers: actor.userId,
+        isDeleted: false,
+      });
+      if (project) isLead = true;
+    }
+    if (!isAssigned && !isLead) {
       throw new AppError(403, "You can only update tasks assigned to you");
     }
     // Workers cannot modify task metadata — only checklist completion
@@ -429,7 +478,7 @@ async function submitForReview(taskId, submissionData, actor) {
   if (!task) throw new AppError(404, "Task not found");
 
   // Enforce worker-only + assignee check
-  assertCanExecuteTask(actor, task);
+  await assertCanExecuteTask(actor, task);
 
   validateStatusTransition(task.status, "review");
   validateReviewSubmission(task, submissionData);
@@ -487,7 +536,7 @@ async function reviewTask(taskId, reviewData, actor) {
   const now = new Date();
 
   // Update latest review fields (convenience)
-  task.status = approved ? "done" : "in-progress";
+  task.status = approved ? "done" : "changes-requested";
   task.reviewComment = comment;
   task.reviewedBy = actor.userId;
   task.reviewedAt = now;
@@ -515,7 +564,7 @@ async function reviewTask(taskId, reviewData, actor) {
 
   // Add a coordinator feedback comment for visibility
   if (comment) {
-    const prefix = approved ? "APPROVED" : "REJECTED";
+    const prefix = approved ? "APPROVED" : "CHANGES REQUESTED";
     task.comments.push({ author: actor.userId, content: `${prefix}: ${comment}` });
   }
 
@@ -634,7 +683,7 @@ async function uploadEvidence(taskId, files, actor) {
 
   // Enforce worker-only + assignee check
   try {
-    assertCanExecuteTask(actor, task);
+    await assertCanExecuteTask(actor, task);
   } catch (err) {
     // Clean uploaded files from disk before propagating the error
     files.forEach((f) => {
@@ -751,6 +800,50 @@ async function getTaskById(id, actor) {
   return toTaskDTO(task);
 }
 
+// ─── getCalendarTasks ────────────────────────────────────────────────────────
+
+/**
+ * Returns tasks for the calendar view — only for principal and co-researcher.
+ *
+ * BUSINESS RULE — STRICT PERSONAL CALENDAR:
+ *   The calendar shows ONLY tasks directly assigned to the logged-in user.
+ *   Both principal and co-researcher follow the same rule.
+ *
+ * Filters applied:
+ *   - assignedTo === actor.userId
+ *   - isDeleted: false              (exclude soft-deleted tasks)
+ *   - project.isDeleted: false      (exclude tasks from soft-deleted projects)
+ *
+ * admin / coordinator receive an empty array — they have dedicated tools.
+ */
+async function getCalendarTasks(actor) {
+  const { userId, role, organization } = actor;
+
+  if (!["principal", "co-researcher"].includes(role)) {
+    return [];
+  }
+
+  // Calendar-specific populate: drop tasks whose project was soft-deleted
+  const calendarPopulate = populateOptions.map((p) =>
+    p.path === "project"
+      ? { ...p, match: { isDeleted: false } }
+      : p
+  );
+
+  const tasks = await Task.find({
+    organization,
+    isDeleted: false,
+    assignedTo: userId,
+  })
+    .populate(calendarPopulate)
+    .sort({ dueDate: 1, createdAt: -1 });
+
+  // Strip orphan tasks whose project reference resolved to null (deleted project)
+  const visibleTasks = tasks.filter((t) => t.project !== null);
+
+  return visibleTasks.map((t) => toTaskDTO(t));
+}
+
 module.exports = {
   createTask,
   getTasksByProject,
@@ -762,4 +855,5 @@ module.exports = {
   submitForReview,
   uploadEvidence,
   deleteEvidence,
+  getCalendarTasks,
 };

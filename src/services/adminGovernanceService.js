@@ -37,7 +37,7 @@ async function getGovernanceData(actor) {
   const now = new Date();
 
   const projects = await Project.find({ organization: orgId, isDeleted: false })
-    .populate({ path: "projectCoordinator", select: "name email role" })
+    .populate({ path: "coordinator", select: "name email role" })
     .populate({ path: "principalResearchers", select: "name email role" })
     .populate({ path: "coResearchers", select: "name email role" })
     .populate({ path: "createdBy", select: "name email role" })
@@ -91,11 +91,11 @@ async function getGovernanceData(actor) {
         id: project._id.toString(),
         title: project.title,
         description: project.description || "",
-        coordinator: project.projectCoordinator
+        coordinator: project.coordinator
           ? {
-              id: project.projectCoordinator._id.toString(),
-              name: project.projectCoordinator.name,
-              email: project.projectCoordinator.email,
+              id: project.coordinator._id.toString(),
+              name: project.coordinator.name,
+              email: project.coordinator.email,
             }
           : null,
         status: project.status,
@@ -136,7 +136,7 @@ async function getProjectReport(actor, projectId) {
     organization: orgId,
     isDeleted: false,
   })
-    .populate({ path: "projectCoordinator", select: "name email role" })
+    .populate({ path: "coordinator", select: "name email role" })
     .populate({ path: "principalResearchers", select: "name email role" })
     .populate({ path: "coResearchers", select: "name email role" })
     .populate({ path: "createdBy", select: "name email role" });
@@ -230,12 +230,12 @@ async function getProjectReport(actor, projectId) {
       createdAt: project.createdAt,
       updatedAt: project.updatedAt,
     },
-    coordinatorInfo: project.projectCoordinator
+    coordinatorInfo: project.coordinator
       ? {
-          id: project.projectCoordinator._id.toString(),
-          name: project.projectCoordinator.name,
-          email: project.projectCoordinator.email,
-          role: project.projectCoordinator.role,
+          id: project.coordinator._id.toString(),
+          name: project.coordinator.name,
+          email: project.coordinator.email,
+          role: project.coordinator.role,
         }
       : null,
     taskMetrics: {
@@ -315,8 +315,8 @@ async function assignCoordinator(actor, projectId, coordinatorId) {
     throw new AppError(400, "User must have the coordinator role to be assigned");
   }
 
-  const previousCoordinator = project.projectCoordinator;
-  project.projectCoordinator = coordinatorId;
+  const previousCoordinator = project.coordinator;
+  project.coordinator = coordinatorId;
   await project.save();
 
   await ProjectMember.deleteMany({ project: projectId, role: "COORDINATOR" });

@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
 const User = require("../models/user");
 const Project = require("../models/project");
-const Task = require("../models/Task");
+const Task = require("../models/task");
 const { AppError } = require("../errors/AppError");
 
 const VALID_ROLES = ["admin", "coordinator", "principal", "co-researcher"];
@@ -61,8 +61,9 @@ async function getUsers(actor, { search = "", role = "", active = "", page = 1, 
             $match: {
               $expr: {
                 $and: [
+                  { $ne: ["$assignedTo", null] },
                   { $eq: ["$assignedTo", "$$uid"] },
-                  { $eq: ["$isDeleted", false] },
+                  { $ne: ["$isDeleted", true] },
                 ],
               },
             },
@@ -84,7 +85,7 @@ async function getUsers(actor, { search = "", role = "", active = "", page = 1, 
               $expr: {
                 $and: [
                   { $eq: ["$projectCoordinator", "$$uid"] },
-                  { $eq: ["$isDeleted", false] },
+                  { $ne: ["$isDeleted", true] },
                 ],
               },
             },
@@ -96,6 +97,7 @@ async function getUsers(actor, { search = "", role = "", active = "", page = 1, 
     },
 
     // Lookup projects where user is a principalResearcher or coResearcher
+    // $ifNull guards prevent $in crash when arrays are null/missing in legacy docs
     {
       $lookup: {
         from: "projects",
@@ -107,11 +109,11 @@ async function getUsers(actor, { search = "", role = "", active = "", page = 1, 
                 $and: [
                   {
                     $or: [
-                      { $in: ["$$uid", "$principalResearchers"] },
-                      { $in: ["$$uid", "$coResearchers"] },
+                      { $in: ["$$uid", { $ifNull: ["$principalResearchers", []] }] },
+                      { $in: ["$$uid", { $ifNull: ["$coResearchers", []] }] },
                     ],
                   },
-                  { $eq: ["$isDeleted", false] },
+                  { $ne: ["$isDeleted", true] },
                 ],
               },
             },
@@ -125,19 +127,19 @@ async function getUsers(actor, { search = "", role = "", active = "", page = 1, 
     // Compute derived stats
     {
       $addFields: {
-        assignedTasksCount: { $size: "$_tasks" },
+        assignedTasksCount: { $size: { $ifNull: ["$_tasks", []] } },
         completedTasksCount: {
           $size: {
-            $filter: { input: "$_tasks", as: "t", cond: { $eq: ["$$t.status", "done"] } },
+            $filter: { input: { $ifNull: ["$_tasks", []] }, as: "t", cond: { $eq: ["$$t.status", "done"] } },
           },
         },
         reviewTasksCount: {
           $size: {
-            $filter: { input: "$_tasks", as: "t", cond: { $eq: ["$$t.status", "review"] } },
+            $filter: { input: { $ifNull: ["$_tasks", []] }, as: "t", cond: { $eq: ["$$t.status", "review"] } },
           },
         },
-        coordinatedProjectsCount: { $size: "$_coordinatedProjects" },
-        memberProjectsCount: { $size: "$_memberProjects" },
+        coordinatedProjectsCount: { $size: { $ifNull: ["$_coordinatedProjects", []] } },
+        memberProjectsCount: { $size: { $ifNull: ["$_memberProjects", []] } },
         _isActive: { $ifNull: ["$isActive", true] },
       },
     },

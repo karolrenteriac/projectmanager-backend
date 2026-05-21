@@ -14,12 +14,16 @@ const {
   deleteTask,
   uploadEvidence,
   deleteEvidence,
+  getCalendarTasks,
 } = require("../controllers/taskController");
 
 const router = express.Router();
 
 // All task routes require authentication
 router.use(protect);
+
+// ── Calendar (researchers only — must come before /:id) ───────────────────
+router.get("/calendar", strictRoleMiddleware(["principal", "co-researcher"]), getCalendarTasks);
 
 // ── Read (all authenticated roles with project access) ─────────────────────
 router.get("/project/:projectId", getTasksByProject);

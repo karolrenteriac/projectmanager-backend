@@ -13,7 +13,7 @@ const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 
 const populateOptions = [
   { path: "createdBy", select: "name email role" },
-  { path: "projectCoordinator", select: "name email role" },
+  { path: "coordinator", select: "name email role" },
   { path: "principalResearchers", select: "name email role" },
   { path: "coResearchers", select: "name email role" },
 ];
@@ -88,7 +88,7 @@ async function createProject(body, actor) {
     startDate,
     endDate,
     status,
-    projectCoordinator,
+    coordinator,
     principalResearchers,
     coResearchers,
   } = body || {};
@@ -108,13 +108,13 @@ async function createProject(body, actor) {
   const orgId = actor.organization;
 
   // ── Validate coordinator ─────────────────────────────────────────────────
-  if (!projectCoordinator) {
+  if (!coordinator) {
     throw new AppError(400, "A project coordinator must be assigned");
   }
-  if (!isValidObjectId(projectCoordinator)) {
-    throw new AppError(400, "Invalid projectCoordinator ID");
+  if (!isValidObjectId(coordinator)) {
+    throw new AppError(400, "Invalid coordinator ID");
   }
-  const coordUser = await User.findOne({ _id: projectCoordinator, organization: orgId, isDeleted: false });
+  const coordUser = await User.findOne({ _id: coordinator, organization: orgId, isDeleted: false });
   if (!coordUser) throw new AppError(400, "Project coordinator not found in your organization");
   if (coordUser.role !== "coordinator") {
     throw new AppError(400, "The assigned project coordinator must have the 'coordinator' role");
@@ -143,12 +143,12 @@ async function createProject(body, actor) {
     progress: 0,
     organization: orgId,
     createdBy: actor.userId,
-    projectCoordinator,
+    coordinator,
     principalResearchers: cleanedPrincipals,
     coResearchers: cleanedCoResearchers,
   });
 
-  await syncProjectMembers(project._id, orgId, projectCoordinator, cleanedPrincipals, cleanedCoResearchers);
+  await syncProjectMembers(project._id, orgId, coordinator, cleanedPrincipals, cleanedCoResearchers);
   await project.populate(populateOptions);
 
   activityLogService
@@ -158,9 +158,9 @@ async function createProject(body, actor) {
       ACTIVITY_ENTITIES.PROJECT,
       project._id,
       orgId,
-      { projectName: project.title, coordinatorId: projectCoordinator },
+      { projectName: project.title, coordinatorId: coordinator },
       null, null, null,
-      { title: project.title, status: project.status, projectCoordinator }
+      { title: project.title, status: project.status, coordinator }
     )
     .catch((err) => console.error("Activity Log Error:", err));
 
@@ -187,7 +187,7 @@ async function getProjects(actor, search) {
   if (actor.role === "admin") {
     projects = await Project.find(baseFilter).populate(populateOptions).sort({ updatedAt: -1 });
   } else if (actor.role === "coordinator") {
-    projects = await Project.find({ ...baseFilter, projectCoordinator: actor.userId })
+    projects = await Project.find({ ...baseFilter, coordinator: actor.userId })
       .populate(populateOptions)
       .sort({ updatedAt: -1 });
   } else if (actor.role === "principal") {
@@ -221,8 +221,8 @@ async function getProjectById(projectId, actor) {
     // full access
   } else if (actor.role === "coordinator") {
     const isAssigned =
-      project.projectCoordinator &&
-      String(project.projectCoordinator._id || project.projectCoordinator) === String(actor.userId);
+      project.coordinator &&
+      String(project.coordinator._id || project.coordinator) === String(actor.userId);
     if (!isAssigned) throw new AppError(403, "Coordinators can only view projects assigned to them");
   } else if (actor.role === "principal") {
     const isMember = project.principalResearchers.some(
@@ -256,7 +256,7 @@ async function updateProject(projectId, body, actor) {
   const before = {
     title: project.title,
     status: project.status,
-    projectCoordinator: project.projectCoordinator,
+    coordinator: project.coordinator,
   };
 
   const orgId = actor.organization;
@@ -267,7 +267,7 @@ async function updateProject(projectId, body, actor) {
     startDate,
     endDate,
     status,
-    projectCoordinator,
+    coordinator,
     principalResearchers,
     coResearchers,
   } = body || {};
@@ -280,17 +280,17 @@ async function updateProject(projectId, body, actor) {
   if (status !== undefined) project.status = status;
 
   // Coordinator update
-  if (projectCoordinator !== undefined) {
-    if (projectCoordinator === null) {
-      project.projectCoordinator = null;
+  if (coordinator !== undefined) {
+    if (coordinator === null) {
+      project.coordinator = null;
     } else {
-      if (!isValidObjectId(projectCoordinator)) throw new AppError(400, "Invalid projectCoordinator ID");
-      const coordUser = await User.findOne({ _id: projectCoordinator, organization: orgId, isDeleted: false });
+      if (!isValidObjectId(coordinator)) throw new AppError(400, "Invalid coordinator ID");
+      const coordUser = await User.findOne({ _id: coordinator, organization: orgId, isDeleted: false });
       if (!coordUser) throw new AppError(400, "Project coordinator not found in your organization");
       if (coordUser.role !== "coordinator") {
         throw new AppError(400, "The assigned project coordinator must have the 'coordinator' role");
       }
-      project.projectCoordinator = projectCoordinator;
+      project.coordinator = coordinator;
     }
   }
 
@@ -319,7 +319,7 @@ async function updateProject(projectId, body, actor) {
   await syncProjectMembers(
     projectId,
     orgId,
-    project.projectCoordinator,
+    project.coordinator,
     project.principalResearchers,
     project.coResearchers
   );
@@ -336,7 +336,7 @@ async function updateProject(projectId, body, actor) {
       { projectName: project.title },
       null, null,
       before,
-      { title: project.title, status: project.status, projectCoordinator: project.projectCoordinator }
+      { title: project.title, status: project.status, coordinator: project.coordinator }
     )
     .catch((err) => console.error("Activity Log Error:", err));
 
@@ -411,8 +411,8 @@ async function exportProject(projectId, actor) {
 
   if (actor.role === "coordinator") {
     const isAssigned =
-      project.projectCoordinator &&
-      String(project.projectCoordinator._id || project.projectCoordinator) === String(actor.userId);
+      project.coordinator &&
+      String(project.coordinator._id || project.coordinator) === String(actor.userId);
     if (!isAssigned) throw new AppError(403, "Coordinators can only export projects assigned to them");
   }
 
@@ -428,7 +428,7 @@ async function exportProject(projectId, actor) {
   return {
     project: projectDTO,
     team: {
-      coordinator: serializeUser(project.projectCoordinator),
+      coordinator: serializeUser(project.coordinator),
       principalResearchers: (project.principalResearchers || []).map(serializeUser),
       coResearchers: (project.coResearchers || []).map(serializeUser),
     },

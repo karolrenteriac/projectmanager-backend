@@ -25,8 +25,21 @@ app.use("/api/projects", projectRoutes);
 const taskRoutes = require("./routes/taskRoutes"); // Tasks
 app.use("/api/tasks", taskRoutes);
 
+const myTasksRoutes = require("./routes/myTasksRoutes"); // Researcher-only Tasks Workspace
+app.use("/api/my-tasks", myTasksRoutes);
+
+const attachmentRoutes = require("./routes/attachmentRoutes"); // Versioned Deliverables
+app.use("/api/tasks", attachmentRoutes);
+
 const dashboardRoutes = require("./routes/dashboardRoutes"); // Analytics & Dashboard
 app.use("/api/dashboard", dashboardRoutes);
+
+const coordinatorDashboardRoutes = require("./routes/coordinatorDashboardRoutes"); // Coordinator Dashboard
+app.use("/api/dashboard/coordinator", coordinatorDashboardRoutes);
+app.use("/api/coordinator", coordinatorDashboardRoutes);
+
+const principalDashboardRoutes = require("./routes/principalDashboardRoutes"); // Principal Dashboard
+app.use("/api/dashboard/principal", principalDashboardRoutes);
 
 const invitationRoutes = require("./routes/invitationRoutes"); // Invitations
 app.use("/api/invitations", invitationRoutes);
@@ -43,14 +56,19 @@ app.use("/api/notifications", notificationRoutes);
 const metricsRoutes = require("./routes/metricsRoutes"); // Metrics & Logs
 app.use("/api/metrics", metricsRoutes);
 
-const reportsRoutes = require("./routes/reportsRoutes"); // PDF & Excel Reports
+// Admin Reports module (analytics & exports) — registered first so its routes
+// resolve directly; unmatched paths fall through to the legacy export router.
+const reportRoutes = require("./routes/reportRoutes");
+app.use("/api/reports", reportRoutes);
+
+const reportsRoutes = require("./routes/reportsRoutes"); // Legacy PDF & Excel report exports
 app.use("/api/reports", reportsRoutes);
 
 const searchRoutes = require("./routes/searchRoutes"); // Search engine
 app.use("/api/search", searchRoutes);
 
-const documentsRoutes = require("./routes/documentsRoutes"); // File Management
-app.use("/api/documents", documentsRoutes);
+const documentRoutes = require("./routes/documentRoutes"); // Admin Documents — institutional research repository
+app.use("/api/documents", documentRoutes);
 
 const adminGovernanceRoutes = require("./routes/adminGovernanceRoutes"); // Admin Governance
 app.use("/api/admin/projects", adminGovernanceRoutes);

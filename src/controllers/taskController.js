@@ -102,3 +102,12 @@ exports.deleteEvidence = async (req, res, next) => {
     handleError(err, res, next);
   }
 };
+
+exports.getCalendarTasks = async (req, res, next) => {
+  try {
+    const tasks = await taskService.getCalendarTasks(req.user);
+    res.json({ tasks });
+  } catch (err) {
+    handleError(err, res, next);
+  }
+};
