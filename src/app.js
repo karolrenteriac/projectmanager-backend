@@ -7,29 +7,24 @@ const app = express();
 // ================================
 // CORS CONFIGURATION
 // ================================
-const allowedOrigins = [
-  "http://localhost:4200",
-  "https://projectmanager-frontend-kohl.vercel.app"
-];
+const express = require("express");
+const cors = require("cors");
+const path = require("path");
+
+const app = express();
 
 app.use(cors({
-  origin: (origin, callback) => {
-
-    // permitir postman/mobile
-    if (!origin) {
-      return callback(null, true);
-    }
-
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
-
-    return callback(new Error("Not allowed by CORS"));
-  },
-  credentials: true,
+  origin: "*",
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"]
 }));
+
+app.options("*", cors());
+
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
 // ================================
 // MIDDLEWARES
