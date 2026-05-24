@@ -1,4 +1,4 @@
-const mongoose = require("mongoose");
+﻿const mongoose = require("mongoose");
 
 const invitationSchema = new mongoose.Schema(
   {
@@ -42,4 +42,4 @@ invitationSchema.index({ token: 1 });
 invitationSchema.index({ email: 1 });
 invitationSchema.index({ expiresAt: 1 });
 
-module.exports = mongoose.model("Invitation", invitationSchema);
+module.exports = mongoose.models.Invitation || mongoose.model("Invitation", invitationSchema);

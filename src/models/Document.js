@@ -1,4 +1,4 @@
-const mongoose = require("mongoose");
+﻿const mongoose = require("mongoose");
 
 const documentSchema = new mongoose.Schema(
   {
@@ -42,4 +42,4 @@ documentSchema.index({ isDeleted: 1 });
 documentSchema.index({ createdAt: -1 });
 documentSchema.index({ name: "text" });
 
-module.exports = mongoose.model("Document", documentSchema);
+module.exports = mongoose.models.Document || mongoose.model("Document", documentSchema);

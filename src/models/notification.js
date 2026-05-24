@@ -1,4 +1,4 @@
-const mongoose = require("mongoose");
+﻿const mongoose = require("mongoose");
 const { NOTIFICATION_TYPES, NOTIFICATION_PRIORITIES } = require("../constants");
 
 const notificationSchema = new mongoose.Schema(
@@ -90,4 +90,4 @@ notificationSchema.index({ priority: 1 });
 notificationSchema.index({ project: 1 });
 notificationSchema.index({ task: 1 });
 
-module.exports = mongoose.model("Notification", notificationSchema);
+module.exports = mongoose.models.Notification || mongoose.model("Notification", notificationSchema);

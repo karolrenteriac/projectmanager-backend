@@ -1,4 +1,4 @@
-const mongoose = require("mongoose");
+﻿const mongoose = require("mongoose");
 
 const activityLogSchema = new mongoose.Schema(
   {
@@ -57,4 +57,4 @@ activityLogSchema.index({ entity: 1 });
 activityLogSchema.index({ entityId: 1 });
 activityLogSchema.index({ createdAt: -1 });
 
-module.exports = mongoose.model("ActivityLog", activityLogSchema);
+module.exports = mongoose.models.ActivityLog || mongoose.model("ActivityLog", activityLogSchema);

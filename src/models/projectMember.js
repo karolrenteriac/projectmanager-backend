@@ -1,4 +1,4 @@
-const mongoose = require("mongoose");
+﻿const mongoose = require("mongoose");
 
 const projectMemberSchema = new mongoose.Schema(
   {
@@ -42,4 +42,4 @@ projectMemberSchema.index({ role: 1 });
 projectMemberSchema.index({ isDeleted: 1 });
 projectMemberSchema.index({ joinedAt: -1 });
 
-module.exports = mongoose.model("ProjectMember", projectMemberSchema);
+module.exports = mongoose.models.ProjectMember || mongoose.model("ProjectMember", projectMemberSchema);

@@ -1,4 +1,4 @@
-const mongoose = require("mongoose");
+﻿const mongoose = require("mongoose");
 
 const eventSchema = new mongoose.Schema(
   {
@@ -67,4 +67,4 @@ eventSchema.index({ startDate: 1 });
 eventSchema.index({ endDate: 1 });
 eventSchema.index({ status: 1 });
 
-module.exports = mongoose.model("Event", eventSchema);
+module.exports = mongoose.models.Event || mongoose.model("Event", eventSchema);

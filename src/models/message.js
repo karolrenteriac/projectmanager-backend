@@ -1,4 +1,4 @@
-const mongoose = require("mongoose");
+﻿const mongoose = require("mongoose");
 
 const messageSchema = new mongoose.Schema(
   {
@@ -25,4 +25,4 @@ messageSchema.index({ chat: 1 });
 messageSchema.index({ sender: 1 });
 messageSchema.index({ createdAt: -1 });
 
-module.exports = mongoose.model("Message", messageSchema);
+module.exports = mongoose.models.Message || mongoose.model("Message", messageSchema);

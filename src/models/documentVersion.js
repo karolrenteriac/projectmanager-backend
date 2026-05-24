@@ -1,4 +1,4 @@
-const mongoose = require("mongoose");
+﻿const mongoose = require("mongoose");
 
 const documentVersionSchema = new mongoose.Schema(
   {
@@ -44,4 +44,4 @@ documentVersionSchema.index({ version: 1 });
 documentVersionSchema.index({ uploadedBy: 1 });
 documentVersionSchema.index({ createdAt: -1 });
 
-module.exports = mongoose.model("DocumentVersion", documentVersionSchema);
+module.exports = mongoose.models.DocumentVersion || mongoose.model("DocumentVersion", documentVersionSchema);
