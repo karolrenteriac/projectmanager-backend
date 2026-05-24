@@ -1,12 +1,21 @@
 const nodemailer = require("nodemailer");
+const dns = require("dns");
+
+// 🔥 FORCE IPV4
+dns.setDefaultResultOrder("ipv4first");
 
 // ================================
-// SMTP TRANSPORTER
+// GMAIL SMTP TRANSPORTER
 // ================================
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: parseInt(process.env.SMTP_PORT),
-  secure: process.env.SMTP_SECURE === "true",
+const gmailTransporter = nodemailer.createTransport({
+
+  host: "smtp.gmail.com",
+
+  port: 587,
+
+  secure: false,
+
+  requireTLS: true,
 
   auth: {
     user: process.env.SMTP_USER,
@@ -14,7 +23,8 @@ const transporter = nodemailer.createTransport({
   },
 
   tls: {
-    rejectUnauthorized: false
+    rejectUnauthorized: false,
+    family: 4
   }
 });
 
@@ -36,7 +46,7 @@ async function sendInvitationEmail(to, token, role) {
   const html = `
   <div style="
     font-family: Arial, sans-serif;
-    background: #f4f7fb;
+    background: #f4f4f4;
     padding: 40px;
   ">
 
@@ -46,29 +56,42 @@ async function sendInvitationEmail(to, token, role) {
       background: white;
       border-radius: 16px;
       overflow: hidden;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.08);
     ">
 
       <div style="
-        background: linear-gradient(135deg,#6366f1,#8b5cf6);
+        background: linear-gradient(135deg,#6C63FF,#8B5CF6);
         padding: 40px;
         text-align: center;
         color: white;
       ">
+
         <h1 style="margin:0;">
           ProjectManager
         </h1>
 
-        <p style="margin-top:10px;">
-          Research Collaboration Platform
+        <p style="
+          margin-top:10px;
+          opacity:0.9;
+        ">
+          Team Collaboration Platform
         </p>
+
       </div>
 
       <div style="padding:40px;">
 
-        <h2>Hello 👋</h2>
+        <h2 style="
+          margin-top:0;
+          color:#111827;
+        ">
+          🚀 You're Invited!
+        </h2>
 
-        <p>
+        <p style="
+          color:#4B5563;
+          line-height:1.6;
+        ">
           You have been invited to join
           <strong>ProjectManager</strong>
           as:
@@ -76,8 +99,8 @@ async function sendInvitationEmail(to, token, role) {
 
         <div style="
           display:inline-block;
-          background:#eef2ff;
-          color:#4f46e5;
+          background:#EEF2FF;
+          color:#6C63FF;
           padding:10px 18px;
           border-radius:999px;
           font-weight:bold;
@@ -86,21 +109,25 @@ async function sendInvitationEmail(to, token, role) {
           ${role}
         </div>
 
-        <p>
-          Click the button below to accept your invitation:
+        <p style="
+          color:#4B5563;
+          line-height:1.6;
+        ">
+          Click below to create your account.
         </p>
 
         <div style="
-          margin:35px 0;
           text-align:center;
+          margin:40px 0;
         ">
+
           <a
             href="${invitationLink}"
             style="
-              background: linear-gradient(135deg,#6366f1,#8b5cf6);
+              background:linear-gradient(135deg,#6C63FF,#8B5CF6);
               color:white;
               padding:16px 28px;
-              border-radius:10px;
+              border-radius:12px;
               text-decoration:none;
               font-weight:bold;
               display:inline-block;
@@ -108,15 +135,13 @@ async function sendInvitationEmail(to, token, role) {
           >
             Accept Invitation
           </a>
+
         </div>
 
-        <p style="color:#666;">
-          Or copy this link:
-        </p>
-
         <p style="
-          word-break: break-all;
-          color:#4f46e5;
+          color:#9CA3AF;
+          font-size:13px;
+          word-break:break-all;
         ">
           ${invitationLink}
         </p>
@@ -130,18 +155,29 @@ async function sendInvitationEmail(to, token, role) {
 
   try {
 
-    await transporter.sendMail({
-      from: `"ProjectManager" <${process.env.SMTP_FROM}>`,
+    // 🔥 VERIFY CONNECTION
+    await gmailTransporter.verify();
+
+    console.log("✅ SMTP READY");
+
+    // 🔥 SEND EMAIL
+    await gmailTransporter.sendMail({
+
+      from: `"ProjectManager" <${process.env.SMTP_USER}>`,
+
       to,
+
       subject,
+
       html
     });
 
-    console.log(`✅ Invitation email sent to ${to}`);
+    console.log(`✅ Email sent to ${to}`);
 
   } catch (err) {
 
     console.error("❌ EMAIL ERROR:");
+
     console.error(err);
 
     throw err;
