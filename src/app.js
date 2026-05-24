@@ -1,26 +1,67 @@
 const express = require("express");
 const cors = require("cors");
+const helmet = require("helmet");
 const path = require("path");
 
 const app = express();
 
 // ================================
-// CORS CONFIGURATION
+// SECURITY MIDDLEWARE
 // ================================
-app.use(cors({
-  origin: "*"
-}));
+
+// Helmet - adds security headers
+app.use(helmet());
 
 // ================================
-// MIDDLEWARES
+// CORS CONFIGURATION
 // ================================
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+
+// 🔥 IMPROVED CORS
+const corsOptions = {
+  origin: function (origin, callback) {
+    const allowedOrigins = [
+      process.env.FRONTEND_URL || "http://localhost:3000",
+      "http://localhost:4200", // Angular dev
+      "http://localhost:3000",
+      "https://projectmanager-frontend-kohl.vercel.app", // Your actual domain
+    ].filter(Boolean);
+
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+  optionsSuccessStatus: 200,
+};
+
+app.use(cors(corsOptions));
+
+// ================================
+// BODY PARSERS
+// ================================
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ limit: "10mb", extended: true }));
 
 // ================================
 // STATIC FILES
 // ================================
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
+
+// ================================
+// HEALTH CHECK
+// ================================
+app.get("/health", (req, res) => {
+  res.status(200).json({
+    status: "ok",
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV,
+  });
+});
 
 // ================================
 // ROUTES
@@ -123,7 +164,8 @@ app.get("/api/test", (req, res) => {
 // ================================
 app.use((req, res) => {
   res.status(404).json({
-    message: `Route ${req.originalUrl} not found`
+    success: false,
+    message: `Route ${req.originalUrl} not found`,
   });
 });
 
@@ -133,9 +175,13 @@ app.use((req, res) => {
 app.use((err, req, res, next) => {
   console.error("❌ GLOBAL ERROR HANDLER:", err.message || err);
 
-  res.status(err.status || 500).json({
+  const statusCode = err.status || err.statusCode || 500;
+  const isDevelopment = process.env.NODE_ENV === "development";
+
+  res.status(statusCode).json({
     success: false,
-    message: err.message || "Internal server error"
+    message: err.message || "Internal server error",
+    ...(isDevelopment && { stack: err.stack }),
   });
 });
 
