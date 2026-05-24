@@ -7,24 +7,9 @@ const app = express();
 // ================================
 // CORS CONFIGURATION
 // ================================
-const express = require("express");
-const cors = require("cors");
-const path = require("path");
-
-const app = express();
-
 app.use(cors({
-  origin: "*",
-  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"]
+  origin: "*"
 }));
-
-app.options("*", cors());
-
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
 // ================================
 // MIDDLEWARES
@@ -56,4 +41,24 @@ app.use("/api/projects", projectRoutes);
 // Tasks
 const taskRoutes = require("./routes/taskRoutes");
 app.use("/api/tasks", taskRoutes);
+
+// ================================
+// TEST ROUTE
+// ================================
+app.get("/api/test", (req, res) => {
+  res.json({ message: "API working" });
+});
+
+// ================================
+// GLOBAL ERROR HANDLER
+// ================================
+app.use((err, req, res, next) => {
+  console.error("❌ GLOBAL ERROR HANDLER:", err.message || err);
+
+  res.status(err.status || 500).json({
+    success: false,
+    message: err.message || "Internal server error"
+  });
+});
+
 module.exports = app;
