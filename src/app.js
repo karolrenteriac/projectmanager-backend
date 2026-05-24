@@ -16,30 +16,39 @@ app.use(helmet());
 // CORS CONFIGURATION
 // ================================
 
-// 🔥 IMPROVED CORS
+// 🔥 CORS CORRECTO PARA RAILWAY + VERCEL
 const corsOptions = {
   origin: function (origin, callback) {
     const allowedOrigins = [
-      process.env.FRONTEND_URL || "http://localhost:3000",
-      "http://localhost:4200", // Angular dev
-      "http://localhost:3000",
-      "https://projectmanager-frontend-kohl.vercel.app", // Your actual domain
+      "http://localhost:4200",      // Angular desarrollo
+      "http://localhost:3000",      // Local fallback
+      process.env.FRONTEND_URL || "https://projectmanager-frontend-kohl.vercel.app",
+      "https://projectmanager-frontend-kohl.vercel.app", // Tu dominio Vercel
     ].filter(Boolean);
 
-    // Allow requests with no origin (like mobile apps or curl requests)
+    console.log(`📍 CORS Request from: ${origin}`);
+
+    // Permite requests sin origin (mobile apps, curl, etc)
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
+      console.warn(`❌ CORS BLOQUEADO: ${origin} no está en whitelist`);
       callback(new Error("Not allowed by CORS"));
     }
   },
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+  exposedHeaders: ["Content-Type", "Authorization"],
   optionsSuccessStatus: 200,
+  maxAge: 86400, // 24 horas
 };
 
+// Aplica CORS a todas las rutas
 app.use(cors(corsOptions));
+
+// Preflight requests
+app.options("*", cors(corsOptions));
 
 // ================================
 // BODY PARSERS
