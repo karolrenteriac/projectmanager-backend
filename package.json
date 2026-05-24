@@ -11,6 +11,9 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@angular/common": "^21.2.8",
+    "@angular/core": "^21.2.8",
+    "@angular/router": "^21.2.8",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",
     "dotenv": "^17.4.0",
