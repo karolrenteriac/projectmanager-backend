@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 const Project = require("../models/project");
-const Task = require("../models/task");
+const Task = require("../models/Task");
 
 // Resolve the current admin's organization as an ObjectId filter.
 // Every query must be scoped to this org to prevent cross-org data leakage.

@@ -1,8 +1,8 @@
 const mongoose = require("mongoose");
 const activityLogService = require("../services/activityLogService");
 const Project = require("../models/project");
-const Task = require("../models/task");
-const Document = require("../models/document");
+const Task = require("../models/Task");
+const Document = require("../models/Document");
 const User = require("../models/user");
 const { handleError } = require("../utils/handleError");
 

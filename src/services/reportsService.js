@@ -1,7 +1,7 @@
 const Project = require("../models/project");
-const Task = require("../models/task");
+const Task = require("../models/Task");
 const User = require("../models/user");
-const Document = require("../models/document");
+const Document = require("../models/Document");
 const { AppError } = require("../errors/AppError");
 const ReportGenerator = require("../utils/reportGenerator");
 

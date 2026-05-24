@@ -1,6 +1,6 @@
 const Project = require("../models/project");
-const Task = require("../models/task");
-const Document = require("../models/document");
+const Task = require("../models/Task");
+const Document = require("../models/Document");
 const User = require("../models/user");
 const Event = require("../models/event");
 const { AppError } = require("../errors/AppError");

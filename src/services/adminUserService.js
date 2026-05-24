@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
 const User = require("../models/user");
 const Project = require("../models/project");
-const Task = require("../models/task");
+const Task = require("../models/Task");
 const { AppError } = require("../errors/AppError");
 
 const VALID_ROLES = ["admin", "coordinator", "principal", "co-researcher"];

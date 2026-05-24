@@ -1,5 +1,5 @@
 const Event = require("../models/event");
-const Task = require("../models/task");
+const Task = require("../models/Task");
 const Project = require("../models/project");
 const { AppError } = require("../errors/AppError");
 const { getPaginationParams, createPaginatedResponse } = require("../utils/pagination");

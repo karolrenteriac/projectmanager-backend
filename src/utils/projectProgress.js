@@ -1,5 +1,5 @@
 const mongoose = require("mongoose");
-const Task = require("../models/task");
+const Task = require("../models/Task");
 const Project = require("../models/project");
 
 /**
