@@ -53,20 +53,16 @@ module.exports = function registerChatSocketHandlers(io) {
         const message = await chatService.sendMessage(chatId, senderId, content);
         
         const chat = await chatService.validateChatAccess(chatId, senderId);
-        
-        const notifications = await notificationService.createMessageNotifications(
+
+        notificationService.createMessageNotifications(
           chatId,
           message,
           senderId,
           chat.members
-        );
+        ).catch((err) => console.error("[Chat Socket] Notification error:", err.message));
 
         io.to(chatId).emit(SOCKET_EVENTS.NEW_MESSAGE, message);
-        
-        notifications.forEach(notification => {
-          io.to(notification.user._id.toString()).emit(SOCKET_EVENTS.NOTIFICATION, notification);
-        });
-        
+
         console.log(`[Chat Socket] Message sent in chat "${chatId}" by ${senderId}`);
       } catch (error) {
         console.error(`[Chat Socket] Error sending message:`, error.message);

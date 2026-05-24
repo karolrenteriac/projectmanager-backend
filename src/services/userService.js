@@ -9,6 +9,24 @@ const { AppError } = require("../errors/AppError");
 const SALT_ROUNDS = 10;
 const JWT_SECRET = process.env.JWT_SECRET;
 
+function resolveAvatarUrl(avatarPath) {
+  if (!avatarPath) return "";
+  if (/^https?:\/\//i.test(avatarPath)) return avatarPath;
+  const base = process.env.BASE_URL || "http://localhost:3000";
+  return `${base}${avatarPath}`;
+}
+
+function buildAuthUserDTO(user) {
+  return {
+    _id: user._id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    avatar: resolveAvatarUrl(user.avatar),
+    biography: user.biography || "",
+  };
+}
+
 async function register(body) {
   const { name, email, password, token, companyName } = body;
 
@@ -73,7 +91,8 @@ async function register(body) {
       email: normalizedEmail,
       password: hashedPassword,
       role: "admin",
-      organization: userId // 🔥 el admin ES la organización
+      organization: userId, // 🔥 el admin ES la organización
+      companyName: companyName.trim()
     });
   }
 
@@ -85,7 +104,7 @@ async function register(body) {
 
   return {
     token: jwtToken,
-    user
+    user: buildAuthUserDTO(user),
   };
 }
 
@@ -116,7 +135,7 @@ async function login(body) {
 
   return {
     token,
-    user
+    user: buildAuthUserDTO(user),
   };
 }
 

@@ -109,10 +109,16 @@ function versionDTO(v) {
     uploadedBy = {
       id: String(v.uploadedBy._id),
       name: v.uploadedBy.name,
-      email: v.uploadedBy.email,
+      email: v.uploadedBy.email || "",
     };
   } else if (v.uploadedBy) {
-    uploadedBy = { id: String(v.uploadedBy), name: null, email: null };
+    uploadedBy = {
+      id: String(v.uploadedBy._id || v.uploadedBy),
+      name: v.uploadedBy.name || "System User",
+      email: v.uploadedBy.email || "",
+    };
+  } else {
+    uploadedBy = { id: "", name: "System User", email: "" };
   }
   return {
     id: String(v._id),
@@ -134,27 +140,34 @@ function documentDTO(doc) {
     versions.find((v) => v.versionNumber === doc.currentVersion) ||
     versions[versions.length - 1] ||
     null;
+  
+  let project = null;
+  if (doc.project) {
+    project = {
+      id: String(doc.project._id || doc.project),
+      title: doc.project.title || "Institutional (no project)",
+      status: doc.project.status || "active",
+    };
+  }
+
+  let uploadedBy = null;
+  if (doc.uploadedBy) {
+    uploadedBy = {
+      id: String(doc.uploadedBy._id || doc.uploadedBy),
+      name: doc.uploadedBy.name || "System User",
+      email: doc.uploadedBy.email || "",
+    };
+  } else {
+    uploadedBy = { id: "", name: "System User", email: "" };
+  }
+
   return {
     id: String(doc._id),
     title: doc.title,
     description: doc.description || "",
     type: doc.type,
-    project:
-      doc.project && doc.project.title
-        ? {
-            id: String(doc.project._id),
-            title: doc.project.title,
-            status: doc.project.status,
-          }
-        : null,
-    uploadedBy:
-      doc.uploadedBy && doc.uploadedBy.name
-        ? {
-            id: String(doc.uploadedBy._id),
-            name: doc.uploadedBy.name,
-            email: doc.uploadedBy.email,
-          }
-        : null,
+    project,
+    uploadedBy,
     tags: doc.tags || [],
     currentVersion: doc.currentVersion,
     totalVersions: versions.length,

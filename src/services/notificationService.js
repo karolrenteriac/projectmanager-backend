@@ -1,171 +1,288 @@
+const mongoose = require("mongoose");
 const Notification = require("../models/notification");
 const { AppError } = require("../errors/AppError");
-const { NOTIFICATION_TYPES } = require("../constants");
+const {
+  NOTIFICATION_TYPES,
+  NOTIFICATION_PRIORITIES,
+  NOTIFICATION_CATEGORIES,
+  NOTIFICATION_CATEGORY_BY_TYPE,
+  SOCKET_EVENTS,
+  getDefaultPriority,
+} = require("../constants");
 const { getPaginationParams, createPaginatedResponse } = require("../utils/pagination");
+const { getIo } = require("../config/io");
+const { toNotificationDTO } = require("../dtos");
 
-async function createNotification(userId, type, message, entityId = null, entityType = null) {
-  if (!userId || !type || !message) {
-    throw new AppError(400, "User ID, type, and message are required.");
+// Reverse map: category → list of notification types (for filter queries).
+const TYPES_BY_CATEGORY = Object.entries(NOTIFICATION_CATEGORY_BY_TYPE).reduce(
+  (acc, [type, category]) => {
+    (acc[category] = acc[category] || []).push(type);
+    return acc;
+  },
+  {}
+);
+
+const POPULATE_OPTIONS = [
+  // `user` is populated so the legacy chat path can read notification.user._id.
+  { path: "user", select: "name email" },
+  { path: "sender", select: "name email avatar role" },
+  { path: "project", select: "title status" },
+  { path: "task", select: "title status" },
+  { path: "deliverable", select: "title status" },
+];
+
+/**
+ * Push a notification to its recipient's socket room in real time.
+ * Best-effort — never throws into the calling workflow.
+ */
+async function emitRealtimeNotification(userId, notification) {
+  try {
+    const io = getIo();
+    if (!io || !userId) return;
+
+    const room = String(userId);
+    io.to(room).emit(SOCKET_EVENTS.NEW_NOTIFICATION, toNotificationDTO(notification));
+
+    const unreadCount = await Notification.countDocuments({ user: userId, read: false });
+    io.to(room).emit(SOCKET_EVENTS.NOTIFICATION_COUNT, { unreadCount });
+  } catch (err) {
+    console.error("[notificationService] realtime emit failed:", err.message);
   }
+}
 
+/**
+ * Create a single notification and push it in real time.
+ *
+ * @param {Object} payload
+ * @param {string} payload.recipient  Recipient user id (alias: `user`)
+ * @param {string} [payload.sender]   Actor user id
+ * @param {string} payload.type       NOTIFICATION_TYPES value
+ * @param {string} [payload.title]
+ * @param {string} payload.message
+ * @param {string} [payload.priority] Defaults to the type's default priority
+ * @param {string} [payload.project]
+ * @param {string} [payload.task]
+ * @param {string} [payload.deliverable]
+ * @param {string} [payload.link]
+ * @param {Object} [payload.metadata]
+ * @param {string} [payload.entityId]   Legacy generic reference
+ * @param {string} [payload.entityType] Legacy generic reference
+ */
+async function createNotification(payload = {}) {
+  const recipient = payload.recipient || payload.user;
+  const { type, message } = payload;
+
+  if (!recipient || !type || !message) {
+    throw new AppError(400, "Recipient, type, and message are required.");
+  }
   if (!Object.values(NOTIFICATION_TYPES).includes(type)) {
-    throw new AppError(400, `Type must be one of: ${Object.values(NOTIFICATION_TYPES).join(", ")}.`);
+    throw new AppError(400, `Unknown notification type: ${type}.`);
   }
 
   const notification = await Notification.create({
-    user: userId,
+    user: recipient,
+    sender: payload.sender || null,
     type,
-    message: message.trim(),
-    entityId,
-    entityType,
+    title: payload.title ? String(payload.title).trim() : undefined,
+    message: String(message).trim(),
+    priority: payload.priority || getDefaultPriority(type),
+    project: payload.project || null,
+    task: payload.task || null,
+    deliverable: payload.deliverable || null,
+    link: payload.link || null,
+    metadata: payload.metadata || {},
+    entityId: payload.entityId,
+    entityType: payload.entityType,
   });
 
-  return await Notification.findById(notification._id)
-    .populate('user', 'name email');
+  const populated = await Notification.findById(notification._id).populate(POPULATE_OPTIONS);
+
+  await emitRealtimeNotification(recipient, populated);
+
+  return populated;
 }
 
-async function getUserNotifications(userId, page = 1, limit = 20, unreadOnly = false) {
-  if (!userId) {
-    throw new AppError(400, "User ID is required.");
-  }
+/**
+ * Create the same notification for many recipients at once.
+ * Recipient ids are de-duplicated; the sender is excluded so actors never
+ * get notified about their own action.
+ *
+ * @param {Array<string>} recipients
+ * @param {Object} basePayload  Same shape as createNotification (minus recipient)
+ */
+async function createBulkNotifications(recipients = [], basePayload = {}) {
+  const senderId = basePayload.sender ? String(basePayload.sender) : null;
 
-  const { limit: validatedLimit, skip } = getPaginationParams({ page, limit });
-  
-  let query = { user: userId };
-  if (unreadOnly) {
+  const uniqueRecipients = [
+    ...new Set(
+      (recipients || [])
+        .filter(Boolean)
+        .map((r) => String(r._id || r))
+    ),
+  ].filter((id) => id !== senderId);
+
+  const results = [];
+  for (const recipient of uniqueRecipients) {
+    try {
+      results.push(await createNotification({ ...basePayload, recipient }));
+    } catch (err) {
+      console.error("[notificationService] bulk create failed:", err.message);
+    }
+  }
+  return results;
+}
+
+/**
+ * Fetch a user's notifications with filtering, search and pagination.
+ * Strictly scoped to the requesting user — no cross-user access.
+ */
+async function getUserNotifications(userId, options = {}) {
+  if (!userId) throw new AppError(400, "User ID is required.");
+
+  const { page, limit, skip } = getPaginationParams(options);
+
+  const query = { user: userId };
+
+  if (options.unreadOnly === true || options.unreadOnly === "true") {
     query.read = false;
   }
+  if (options.type) {
+    query.type = options.type;
+  }
+  if (options.category) {
+    const types = TYPES_BY_CATEGORY[options.category];
+    if (types) query.type = { $in: types };
+  }
+  if (options.priority) {
+    query.priority = options.priority;
+  }
+  if (options.search && String(options.search).trim()) {
+    const safe = String(options.search).trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const rx = new RegExp(safe, "i");
+    query.$or = [{ title: rx }, { message: rx }];
+  }
+  if (options.dateFrom || options.dateTo) {
+    query.createdAt = {};
+    if (options.dateFrom) query.createdAt.$gte = new Date(options.dateFrom);
+    if (options.dateTo) query.createdAt.$lte = new Date(options.dateTo);
+  }
 
-  const notifications = await Notification.find(query)
-    .populate('entityId')
-    .sort({ createdAt: -1 })
-    .skip(skip)
-    .limit(validatedLimit);
-
-  const total = await Notification.countDocuments(query);
-  const unreadCount = await Notification.countDocuments({ user: userId, read: false });
+  const [notifications, total, unreadCount] = await Promise.all([
+    Notification.find(query)
+      .populate(POPULATE_OPTIONS)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit),
+    Notification.countDocuments(query),
+    Notification.countDocuments({ user: userId, read: false }),
+  ]);
 
   return {
-    ...createPaginatedResponse(notifications, total, page, validatedLimit),
+    ...createPaginatedResponse(notifications, total, page, limit),
     unreadCount,
   };
 }
 
 async function markNotificationAsRead(notificationId, userId) {
-  if (!notificationId) {
-    throw new AppError(400, "Notification ID is required.");
+  if (!notificationId || !mongoose.Types.ObjectId.isValid(String(notificationId))) {
+    throw new AppError(400, "A valid notification ID is required.");
   }
 
+  // Ownership enforced in the query — a user can only read their own.
   const notification = await Notification.findOne({ _id: notificationId, user: userId });
-  if (!notification) {
-    throw new AppError(404, "Notification not found.");
+  if (!notification) throw new AppError(404, "Notification not found.");
+
+  if (!notification.read) {
+    notification.read = true;
+    notification.readAt = new Date();
+    await notification.save();
   }
 
-  notification.read = true;
-  await notification.save();
+  const populated = await Notification.findById(notification._id).populate(POPULATE_OPTIONS);
 
-  return notification;
+  const io = getIo();
+  if (io) {
+    const unreadCount = await Notification.countDocuments({ user: userId, read: false });
+    io.to(String(userId)).emit(SOCKET_EVENTS.NOTIFICATION_COUNT, { unreadCount });
+  }
+
+  return populated;
 }
 
 async function markAllNotificationsAsRead(userId) {
-  if (!userId) {
-    throw new AppError(400, "User ID is required.");
-  }
+  if (!userId) throw new AppError(400, "User ID is required.");
 
   const result = await Notification.updateMany(
     { user: userId, read: false },
-    { read: true }
+    { read: true, readAt: new Date() }
   );
 
-  return {
-    modifiedCount: result.modifiedCount,
-  };
+  const io = getIo();
+  if (io) {
+    io.to(String(userId)).emit(SOCKET_EVENTS.NOTIFICATION_COUNT, { unreadCount: 0 });
+  }
+
+  return { modifiedCount: result.modifiedCount };
+}
+
+async function deleteNotification(notificationId, userId) {
+  if (!notificationId || !mongoose.Types.ObjectId.isValid(String(notificationId))) {
+    throw new AppError(400, "A valid notification ID is required.");
+  }
+
+  // Ownership enforced in the query.
+  const notification = await Notification.findOneAndDelete({ _id: notificationId, user: userId });
+  if (!notification) throw new AppError(404, "Notification not found.");
+
+  const io = getIo();
+  if (io) {
+    const unreadCount = await Notification.countDocuments({ user: userId, read: false });
+    io.to(String(userId)).emit(SOCKET_EVENTS.NOTIFICATION_COUNT, { unreadCount });
+  }
+
+  return { deleted: true };
 }
 
 async function getUnreadCount(userId) {
-  if (!userId) {
-    throw new AppError(400, "User ID is required.");
-  }
-
+  if (!userId) throw new AppError(400, "User ID is required.");
   const count = await Notification.countDocuments({ user: userId, read: false });
   return { unreadCount: count };
 }
 
+/**
+ * Legacy chat path — one notification per chat member except the sender.
+ * Retained so the existing chat/socket code keeps working unchanged.
+ */
 async function createMessageNotifications(chatId, message, senderId, chatMembers) {
-  const notifications = [];
-  
-  for (const memberId of chatMembers) {
-    if (memberId.toString() !== senderId.toString()) {
-      const notification = await createNotification(
-        memberId,
-        NOTIFICATION_TYPES.MESSAGE_RECEIVED,
-        `New message in chat: ${message.content.substring(0, 50)}${message.content.length > 50 ? '...' : ''}`,
-        message._id,
-        'Message'
-      );
-      notifications.push(notification);
-    }
-  }
-
-  return notifications;
-}
-
-async function createTaskAssignedNotification(taskId, assignedUserId, taskTitle) {
-  return await createNotification(
-    assignedUserId,
-    NOTIFICATION_TYPES.TASK_ASSIGNED,
-    `You have been assigned to task: ${taskTitle}`,
-    taskId,
-    'Task'
+  const recipients = (chatMembers || []).filter(
+    (m) => String(m) !== String(senderId)
   );
-}
+  const preview = `${message.content.substring(0, 50)}${
+    message.content.length > 50 ? "..." : ""
+  }`;
 
-async function createProjectUpdatedNotification(projectId, projectMembers, projectName, updatedBy) {
-  const notifications = [];
-  
-  for (const memberId of projectMembers) {
-    if (memberId.toString() !== updatedBy.toString()) {
-      const notification = await createNotification(
-        memberId,
-        NOTIFICATION_TYPES.PROJECT_UPDATED,
-        `Project "${projectName}" has been updated`,
-        projectId,
-        'Project'
-      );
-      notifications.push(notification);
-    }
-  }
-
-  return notifications;
-}
-
-async function createDocumentUploadedNotification(documentId, projectMembers, documentName, uploadedBy) {
-  const notifications = [];
-  
-  for (const memberId of projectMembers) {
-    if (memberId.toString() !== uploadedBy.toString()) {
-      const notification = await createNotification(
-        memberId,
-        NOTIFICATION_TYPES.DOCUMENT_UPLOADED,
-        `New document "${documentName}" uploaded to project`,
-        documentId,
-        'Document'
-      );
-      notifications.push(notification);
-    }
-  }
-
-  return notifications;
+  return createBulkNotifications(recipients, {
+    sender: senderId,
+    type: NOTIFICATION_TYPES.MESSAGE_RECEIVED,
+    title: "New message",
+    message: preview,
+    priority: NOTIFICATION_PRIORITIES.LOW,
+    entityId: message._id,
+    entityType: "Message",
+    link: "/chat",
+    metadata: { chatId: String(chatId) },
+  });
 }
 
 module.exports = {
   createNotification,
+  createBulkNotifications,
   getUserNotifications,
   markNotificationAsRead,
   markAllNotificationsAsRead,
+  deleteNotification,
   getUnreadCount,
+  emitRealtimeNotification,
   createMessageNotifications,
-  createTaskAssignedNotification,
-  createProjectUpdatedNotification,
-  createDocumentUploadedNotification,
+  NOTIFICATION_CATEGORIES,
 };

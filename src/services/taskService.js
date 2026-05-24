@@ -10,6 +10,7 @@ const { ensureProjectMember } = require("../utils/projectAccess");
 const { updateProjectProgress } = require("../utils/projectProgress");
 const { emitToProjectRoom } = require("../utils/socketEmit");
 const activityLogService = require("./activityLogService");
+const notificationEvents = require("./notificationEvents");
 const { ACTIVITY_ACTIONS, ACTIVITY_ENTITIES } = require("../constants/activity");
 const {
   validateChecklist,
@@ -222,6 +223,11 @@ async function createTask(body, actor) {
     .catch(console.error);
 
   emitToProjectRoom(project, "taskCreated", formatSocketPayload("taskCreated", project, task, actor));
+
+  // Notify the assigned researcher.
+  if (task.assignedTo) {
+    notificationEvents.taskAssigned({ task, assigneeId: task.assignedTo, actor });
+  }
 
   return toTaskDTO(task);
 }
@@ -461,6 +467,25 @@ async function updateTask(taskId, body, actor) {
     formatSocketPayload("taskUpdated", task.project, task, actor)
   );
 
+  // ── Notifications ─────────────────────────────────────────────────────────
+  if (status !== undefined && status !== before.status) {
+    if (status === "done") {
+      notificationEvents.taskCompleted({ task, actor });
+    } else {
+      notificationEvents.taskStatusChanged({
+        task, previousStatus: before.status, newStatus: status, actor,
+      });
+    }
+  }
+  const finalAssignee = String(task.assignedTo?._id || task.assignedTo || "");
+  if (
+    assignedTo !== undefined &&
+    finalAssignee &&
+    finalAssignee !== String(before.assignedTo || "")
+  ) {
+    notificationEvents.taskAssigned({ task, assigneeId: task.assignedTo, actor });
+  }
+
   return toTaskDTO(task);
 }
 
@@ -504,6 +529,9 @@ async function submitForReview(taskId, submissionData, actor) {
     "reviewRequested",
     formatSocketPayload("reviewRequested", task.project, task, actor)
   );
+
+  // Notify the project coordinator that work awaits review.
+  notificationEvents.reviewSubmitted({ task, actor });
 
   return toTaskDTO(task);
 }
@@ -585,6 +613,13 @@ async function reviewTask(taskId, reviewData, actor) {
   const event = approved ? "reviewApproved" : "reviewRejected";
   const projectId = task.project?._id || task.project;
   emitToProjectRoom(projectId, event, formatSocketPayload(event, projectId, task, actor));
+
+  // Notify the assignee of the review outcome.
+  if (approved) {
+    notificationEvents.reviewApproved({ task, actor, comment });
+  } else {
+    notificationEvents.changesRequested({ task, actor, comment });
+  }
 
   return toTaskDTO(task);
 }

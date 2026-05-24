@@ -2,10 +2,11 @@ const chatService = require("../services/chatService");
 const notificationService = require("../services/notificationService");
 const { handleError } = require("../utils/handleError");
 const { getIo } = require("../config/io");
-const { 
-  toChatDTO, 
-  toMessageDTO, 
-  toMessageWithChatDTO 
+const {
+  toChatDTO,
+  toMessageDTO,
+  toMessageWithChatDTO,
+  toUserDTO,
 } = require("../dtos");
 
 const createChat = async (req, res, next) => {
@@ -36,8 +37,8 @@ const getChatMessages = async (req, res, next) => {
     return res.json({
       success: true,
       data: {
-        items: result.items,
-        pagination: result.pagination
+        items: result.items.map(toMessageDTO),
+        pagination: result.pagination,
       },
     });
   } catch (err) {
@@ -53,21 +54,17 @@ const sendMessage = async (req, res, next) => {
     const message = await chatService.sendMessage(chatId, senderId, content);
 
     const chat = await chatService.validateChatAccess(chatId, senderId);
-    
-    const notifications = await notificationService.createMessageNotifications(
+
+    notificationService.createMessageNotifications(
       chatId,
       message,
       senderId,
       chat.members
-    );
+    ).catch((err) => console.error("[Chat Controller] Notification error:", err.message));
 
     const io = getIo();
     if (io) {
       io.to(chatId).emit("newMessage", toMessageDTO(message));
-      
-      notifications.forEach(notification => {
-        io.to(notification.user._id.toString()).emit("notification", notification);
-      });
     }
 
     return res.status(201).json({
@@ -115,10 +112,37 @@ const joinChat = async (req, res, next) => {
   }
 };
 
+const getMessageableUsers = async (req, res, next) => {
+  try {
+    const userId = req.user.userId;
+
+    const users = await chatService.getMessageableUsers(userId);
+
+    return res.json({
+      success: true,
+      data: users.map(toUserDTO),
+    });
+  } catch (err) {
+    handleError(err, res, next);
+  }
+};
+
+const getUnreadCount = async (req, res, next) => {
+  try {
+    const userId = req.user.userId;
+    const count = await chatService.getUnreadCount(userId);
+    return res.json({ success: true, count });
+  } catch (err) {
+    handleError(err, res, next);
+  }
+};
+
 module.exports = {
   createChat,
   getChatMessages,
   sendMessage,
   getUserChats,
   joinChat,
+  getMessageableUsers,
+  getUnreadCount,
 };

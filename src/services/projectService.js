@@ -1,12 +1,14 @@
 const mongoose = require("mongoose");
 const Project = require("../models/project");
 const ProjectMember = require("../models/projectMember");
+const Chat = require("../models/chat");
 const Task = require("../models/Task");
 const User = require("../models/user");
 const { AppError } = require("../errors/AppError");
 const { toProjectDTO } = require("../dtos/projectDto");
 const { emitToProjectRoom } = require("../utils/socketEmit");
 const activityLogService = require("./activityLogService");
+const notificationEvents = require("./notificationEvents");
 const { ACTIVITY_ACTIONS, ACTIVITY_ENTITIES } = require("../constants/activity");
 
 const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
@@ -151,6 +153,20 @@ async function createProject(body, actor) {
   await syncProjectMembers(project._id, orgId, coordinator, cleanedPrincipals, cleanedCoResearchers);
   await project.populate(populateOptions);
 
+  // Auto-create the project group chat so all members can communicate immediately.
+  const chatMemberIds = [...new Set([
+    String(coordinator),
+    ...cleanedPrincipals.map(String),
+    ...cleanedCoResearchers.map(String),
+  ])];
+  Chat.create({
+    type: "PROJECT",
+    project: project._id,
+    members: chatMemberIds,
+    organization: orgId,
+    createdBy: actor.userId,
+  }).catch((err) => console.error("Project chat creation error:", err));
+
   activityLogService
     .logActivity(
       actor.userId,
@@ -163,6 +179,9 @@ async function createProject(body, actor) {
       { title: project.title, status: project.status, coordinator }
     )
     .catch((err) => console.error("Activity Log Error:", err));
+
+  // Notify the coordinator and every researcher assigned to the new project.
+  notificationEvents.projectAssigned({ project, actor });
 
   return toProjectDTO(project);
 }
@@ -348,6 +367,9 @@ async function updateProject(projectId, body, actor) {
     timestamp: new Date().toISOString(),
     data: dto,
   });
+
+  // Notify every project member of the update (completion gets its own type).
+  notificationEvents.projectUpdated({ project, previousStatus: before.status, actor });
 
   return dto;
 }

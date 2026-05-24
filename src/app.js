@@ -41,6 +41,10 @@ app.use("/api/coordinator", coordinatorDashboardRoutes);
 const principalDashboardRoutes = require("./routes/principalDashboardRoutes"); // Principal Dashboard
 app.use("/api/dashboard/principal", principalDashboardRoutes);
 
+const coResearcherDashboardRoutes = require("./routes/coResearcherDashboardRoutes"); // Co-Researcher Dashboard
+app.use("/api/dashboard/co-researcher", coResearcherDashboardRoutes);
+app.use("/api/co-researcher", coResearcherDashboardRoutes);
+
 const invitationRoutes = require("./routes/invitationRoutes"); // Invitations
 app.use("/api/invitations", invitationRoutes);
 
@@ -63,6 +67,9 @@ app.use("/api/reports", reportRoutes);
 
 const reportsRoutes = require("./routes/reportsRoutes"); // Legacy PDF & Excel report exports
 app.use("/api/reports", reportsRoutes);
+
+const settingsRoutes = require("./routes/settingsRoutes"); // User profile & settings
+app.use("/api/settings", settingsRoutes);
 
 const searchRoutes = require("./routes/searchRoutes"); // Search engine
 app.use("/api/search", searchRoutes);

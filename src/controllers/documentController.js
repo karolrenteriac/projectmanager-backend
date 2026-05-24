@@ -86,7 +86,7 @@ const getMeta = async (req, res, next) => {
 const getDocument = async (req, res, next) => {
   try {
     const document = await documentService.getDocument(req.user, req.params.id);
-    res.json({ success: true, document });
+    res.json({ success: true, document, data: document });
   } catch (err) {
     handleError(err, res, next);
   }

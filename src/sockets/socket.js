@@ -1,9 +1,14 @@
 const registerChatSocketHandlers = require("./chatSocket");
+const registerNotificationSocket = require("./notificationSocket");
 
 /**
  * @param {import("socket.io").Server} io
  */
 module.exports = function registerSocketHandlers(io) {
+  // Registered first so the JWT auth middleware (io.use) is in place before
+  // any connection is processed.
+  registerNotificationSocket(io);
+
   io.on("connection", (socket) => {
     console.log(`[Socket] Connected: ${socket.id}`);
 

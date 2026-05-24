@@ -9,6 +9,7 @@ const User = require("../models/user");
 const { AppError } = require("../errors/AppError");
 const { emitToProjectRoom } = require("../utils/socketEmit");
 const activityLogService = require("./activityLogService");
+const notificationEvents = require("./notificationEvents");
 const { ACTIVITY_ACTIONS, ACTIVITY_ENTITIES } = require("../constants/activity");
 
 const WORKER_ROLES = ["principal", "co-researcher"];
@@ -170,6 +171,9 @@ async function uploadInitialDeliverable(taskId, file, title, description, actor)
     }
   );
 
+  // Notify the project coordinator of the new deliverable.
+  notificationEvents.deliverableUploaded({ task, attachment, actor });
+
   return { attachment, taskStatus: task.status };
 }
 
@@ -288,6 +292,9 @@ async function uploadNewVersion(taskId, attachmentId, file, changeReason, actor)
       },
     }
   );
+
+  // Notify the project coordinator that a new version is available.
+  notificationEvents.deliverableVersionUploaded({ task, attachment, actor });
 
   return { attachment, taskStatus: task.status };
 }
@@ -512,6 +519,11 @@ async function reviewDeliverable(taskId, attachmentId, approved, reviewFeedback,
     );
   }
 
+  // Notify the assignee of the deliverable review outcome.
+  notificationEvents.deliverableReviewed({
+    task, attachment, approved, actor, feedback: reviewFeedback,
+  });
+
   return {
     attachment: await TaskAttachment.findById(attachmentId).populate(populateOptions),
     version: formatVersionForResponse(latestVersion),
@@ -675,6 +687,9 @@ async function submitDeliverable(taskId, attachmentId, actor) {
     }
   );
 
+  // Notify the project coordinator that a deliverable awaits review.
+  notificationEvents.reviewSubmitted({ task, actor });
+
   return { attachment, taskStatus: task.status };
 }
 
@@ -753,6 +768,9 @@ async function deleteDeliverable(taskId, attachmentId, actor) {
       }
     );
   }
+
+  // Notify the project coordinator that a deliverable draft was removed.
+  notificationEvents.deliverableDeleted({ task, attachment, actor });
 
   return { success: true, message: "Deliverable draft deleted successfully" };
 }

@@ -38,6 +38,16 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+
+    // ── Profile (Settings page) ──────────────────────────────────────────
+    biography: { type: String, default: "", trim: true, maxlength: 2000 },
+    avatar:    { type: String, default: "" }, // relative path: /uploads/avatars/<filename>
+
+    // ── Institutional identity ───────────────────────────────────────────
+    // Only meaningful on admin documents (admin = organization owner).
+    // For non-admin users, the institution is resolved by looking up their
+    // organization's admin document. Always read-only via profile API.
+    companyName: { type: String, default: "", trim: true },
   },
   { timestamps: true }
 );

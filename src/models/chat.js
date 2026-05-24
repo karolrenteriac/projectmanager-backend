@@ -4,7 +4,7 @@ const chatSchema = new mongoose.Schema(
   {
     type: {
       type: String,
-      enum: ["PROJECT", "TASK", "TEAM"],
+      enum: ["PROJECT", "TASK", "TEAM", "DIRECT"],
       required: true,
     },
     project: {
@@ -28,6 +28,11 @@ const chatSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
+    },
+    lastMessage: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Message",
+      default: null,
     },
     isDeleted: {
       type: Boolean,

@@ -1,10 +1,12 @@
 const express = require("express");
-const { 
-  createChat, 
-  getChatMessages, 
-  sendMessage, 
-  getUserChats, 
-  joinChat 
+const {
+  createChat,
+  getChatMessages,
+  sendMessage,
+  getUserChats,
+  joinChat,
+  getMessageableUsers,
+  getUnreadCount,
 } = require("../controllers/chatController");
 const { protect } = require("../middleware/authMiddleware");
 
@@ -14,6 +16,9 @@ router.use(protect);
 
 router.post("/", createChat);
 router.get("/", getUserChats);
+// Static paths must come before /:id patterns
+router.get("/unread", getUnreadCount);
+router.get("/messageable-users", getMessageableUsers);
 router.get("/:id/messages", getChatMessages);
 router.post("/messages", sendMessage);
 router.post("/join", joinChat);
