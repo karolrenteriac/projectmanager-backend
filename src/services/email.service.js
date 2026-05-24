@@ -7,7 +7,9 @@ let _resend = null;
 // RESEND CLIENT
 // ================================
 function getResendClient() {
+
   if (!_resend) {
+
     const apiKey = process.env.RESEND_API_KEY;
 
     if (!apiKey) {
@@ -24,10 +26,20 @@ function getResendClient() {
 // GMAIL TRANSPORTER
 // ================================
 const gmailTransporter = nodemailer.createTransport({
-  service: "gmail",
+
+  host: "smtp.gmail.com",
+
+  port: 587,
+
+  secure: false,
+
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS
+  },
+
+  tls: {
+    rejectUnauthorized: false
   }
 });
 
@@ -35,10 +47,15 @@ const gmailTransporter = nodemailer.createTransport({
 // SEND WITH GMAIL
 // ================================
 async function sendWithGmail(to, subject, html) {
+
   await gmailTransporter.sendMail({
+
     from: `"ProjectManager" <${process.env.EMAIL_USER}>`,
+
     to,
+
     subject,
+
     html
   });
 
@@ -83,10 +100,10 @@ async function sendInvitationEmail(to, token, role) {
 
   try {
 
-    // 🔥 DIRECTLY USE GMAIL
+    // 🔥 USE GMAIL
     await sendWithGmail(to, subject, html);
 
-    console.log("✅ Invitation email sent");
+    console.log("✅ Invitation email sent successfully");
 
   } catch (err) {
 
