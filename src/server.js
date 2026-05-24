@@ -1,3 +1,7 @@
+// ⚡ FORCE IPv4 DNS - DEBE SER PRIMERA LÍNEA
+const dns = require("dns");
+dns.setDefaultResultOrder("ipv4first");
+
 require("dotenv").config();
 const http = require("http");
 const socketIo = require("socket.io");
