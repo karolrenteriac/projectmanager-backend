@@ -44,11 +44,8 @@ const corsOptions = {
   maxAge: 86400, // 24 horas
 };
 
-// Aplica CORS a todas las rutas
+// Aplica CORS a todas las rutas (incluye preflight automáticamente)
 app.use(cors(corsOptions));
-
-// Preflight requests
-app.options("*", cors(corsOptions));
 
 // ================================
 // BODY PARSERS
