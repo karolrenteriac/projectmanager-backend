@@ -9,27 +9,26 @@ const app = express();
 // ================================
 const allowedOrigins = [
   "http://localhost:4200",
-  "https://projectmanager-frontend-kohl.vercel.app",
-  "https://projectmanager-fron-git-d68c35-karolrenteria2005-4944s-projects.vercel.app",
-  "https://projectmanager-frontend-qdbeogelt.vercel.app"
+  "https://projectmanager-frontend-kohl.vercel.app"
 ];
 
 app.use(cors({
-  origin: function (origin, callback) {
+  origin: (origin, callback) => {
 
-    // Permitir requests sin origin (Postman/mobile apps)
+    // permitir postman/mobile
     if (!origin) {
       return callback(null, true);
     }
 
     if (allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error("Not allowed by CORS"));
+      return callback(null, true);
     }
+
+    return callback(new Error("Not allowed by CORS"));
   },
-  methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
-  credentials: true
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"]
 }));
 
 // ================================
