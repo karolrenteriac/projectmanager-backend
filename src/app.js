@@ -4,133 +4,177 @@ const path = require("path");
 
 const app = express();
 
-// Middlewares
-app.use(cors());
+// ================================
+// CORS CONFIGURATION
+// ================================
+app.use(cors({
+  origin: [
+    "http://localhost:4200",
+    "https://projectmanager-frontend-kohl.vercel.app"
+  ],
+  credentials: true
+}));
+
+// ================================
+// MIDDLEWARES
+// ================================
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Serve uploaded evidence files statically
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+// ================================
+// STATIC FILES
+// ================================
+app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
-// Routes Registration
-const authRoutes = require("./routers/authRouters"); // Authentication
+// ================================
+// ROUTES
+// ================================
+
+// Authentication
+const authRoutes = require("./routers/authRouters");
 app.use("/api/auth", authRoutes);
 
-const userRoutes = require("./routes/userRoutes"); // Users
+// Users
+const userRoutes = require("./routes/userRoutes");
 app.use("/api/users", userRoutes);
 
-const projectRoutes = require("./routes/projectRoutes"); // Projects
+// Projects
+const projectRoutes = require("./routes/projectRoutes");
 app.use("/api/projects", projectRoutes);
 
-const taskRoutes = require("./routes/taskRoutes"); // Tasks
+// Tasks
+const taskRoutes = require("./routes/taskRoutes");
 app.use("/api/tasks", taskRoutes);
 
-const myTasksRoutes = require("./routes/myTasksRoutes"); // Researcher-only Tasks Workspace
+// Researcher Tasks Workspace
+const myTasksRoutes = require("./routes/myTasksRoutes");
 app.use("/api/my-tasks", myTasksRoutes);
 
-const attachmentRoutes = require("./routes/attachmentRoutes"); // Versioned Deliverables
+// Attachments
+const attachmentRoutes = require("./routes/attachmentRoutes");
 app.use("/api/tasks", attachmentRoutes);
 
-const dashboardRoutes = require("./routes/dashboardRoutes"); // Analytics & Dashboard
+// Dashboard
+const dashboardRoutes = require("./routes/dashboardRoutes");
 app.use("/api/dashboard", dashboardRoutes);
 
-const coordinatorDashboardRoutes = require("./routes/coordinatorDashboardRoutes"); // Coordinator Dashboard
+// Coordinator Dashboard
+const coordinatorDashboardRoutes = require("./routes/coordinatorDashboardRoutes");
 app.use("/api/dashboard/coordinator", coordinatorDashboardRoutes);
 app.use("/api/coordinator", coordinatorDashboardRoutes);
 
-const principalDashboardRoutes = require("./routes/principalDashboardRoutes"); // Principal Dashboard
+// Principal Dashboard
+const principalDashboardRoutes = require("./routes/principalDashboardRoutes");
 app.use("/api/dashboard/principal", principalDashboardRoutes);
 
-const coResearcherDashboardRoutes = require("./routes/coResearcherDashboardRoutes"); // Co-Researcher Dashboard
+// Co-Researcher Dashboard
+const coResearcherDashboardRoutes = require("./routes/coResearcherDashboardRoutes");
 app.use("/api/dashboard/co-researcher", coResearcherDashboardRoutes);
 app.use("/api/co-researcher", coResearcherDashboardRoutes);
 
-const invitationRoutes = require("./routes/invitationRoutes"); // Invitations
+// Invitations
+const invitationRoutes = require("./routes/invitationRoutes");
 app.use("/api/invitations", invitationRoutes);
 
-const chatRoutes = require("./routes/chatRoutes"); // Chat system
+// Chat
+const chatRoutes = require("./routes/chatRoutes");
 app.use("/api/chats", chatRoutes);
 
-const calendarRoutes = require("./routes/calendarRoutes"); // Calendar events
+// Calendar
+const calendarRoutes = require("./routes/calendarRoutes");
 app.use("/api/calendar", calendarRoutes);
 
-const notificationRoutes = require("./routes/notificationRoutes"); // Notifications
+// Notifications
+const notificationRoutes = require("./routes/notificationRoutes");
 app.use("/api/notifications", notificationRoutes);
 
-const metricsRoutes = require("./routes/metricsRoutes"); // Metrics & Logs
+// Metrics
+const metricsRoutes = require("./routes/metricsRoutes");
 app.use("/api/metrics", metricsRoutes);
 
-// Admin Reports module (analytics & exports) — registered first so its routes
-// resolve directly; unmatched paths fall through to the legacy export router.
+// Reports
 const reportRoutes = require("./routes/reportRoutes");
 app.use("/api/reports", reportRoutes);
 
-const reportsRoutes = require("./routes/reportsRoutes"); // Legacy PDF & Excel report exports
+const reportsRoutes = require("./routes/reportsRoutes");
 app.use("/api/reports", reportsRoutes);
 
-const settingsRoutes = require("./routes/settingsRoutes"); // User profile & settings
+// Settings
+const settingsRoutes = require("./routes/settingsRoutes");
 app.use("/api/settings", settingsRoutes);
 
-const searchRoutes = require("./routes/searchRoutes"); // Search engine
+// Search
+const searchRoutes = require("./routes/searchRoutes");
 app.use("/api/search", searchRoutes);
 
-const documentRoutes = require("./routes/documentRoutes"); // Admin Documents — institutional research repository
+// Documents
+const documentRoutes = require("./routes/documentRoutes");
 app.use("/api/documents", documentRoutes);
 
-const adminGovernanceRoutes = require("./routes/adminGovernanceRoutes"); // Admin Governance
+// Governance
+const adminGovernanceRoutes = require("./routes/adminGovernanceRoutes");
 app.use("/api/admin/projects", adminGovernanceRoutes);
 
-// Test route
+// ================================
+// TEST ROUTE
+// ================================
 app.get("/api/test", (req, res) => {
   res.json({ message: "API working" });
 });
 
-// 404 handler
+// ================================
+// 404 HANDLER
+// ================================
 app.use((req, res) => {
-  res.status(404).json({ message: `Route ${req.originalUrl} not found` });
+  res.status(404).json({
+    message: `Route ${req.originalUrl} not found`
+  });
 });
 
-// Global Error handler
+// ================================
+// GLOBAL ERROR HANDLER
+// ================================
 app.use((err, req, res, next) => {
   console.error("❌ GLOBAL ERROR HANDLER:", err.message || err);
 
-  // Handle ValidationError
+  // ValidationError
   if (err.name === "ValidationError") {
-    return res.status(400).json({ 
+    return res.status(400).json({
       success: false,
-      message: err.message 
+      message: err.message
     });
   }
 
-  // Handle CastError (invalid MongoDB ID)
+  // Invalid Mongo ID
   if (err.name === "CastError") {
-    return res.status(400).json({ 
+    return res.status(400).json({
       success: false,
-      message: "Invalid ID format" 
+      message: "Invalid ID format"
     });
   }
 
-  // Handle MongoError (duplicate key, etc)
+  // Duplicate Key
   if (err.code === 11000) {
     const field = Object.keys(err.keyPattern)[0];
-    return res.status(400).json({ 
+
+    return res.status(400).json({
       success: false,
-      message: `Duplicate value for field: ${field}` 
+      message: `Duplicate value for field: ${field}`
     });
   }
 
-  // Handle AppError (custom errors with statusCode)
+  // Custom AppError
   if (err.statusCode) {
-    return res.status(err.statusCode).json({ 
+    return res.status(err.statusCode).json({
       success: false,
-      message: err.message 
+      message: err.message
     });
   }
 
-  // Default error response
-  res.status(err.status || 500).json({ 
+  // Default Error
+  res.status(err.status || 500).json({
     success: false,
-    message: err.message || "Internal server error" 
+    message: err.message || "Internal server error"
   });
 });
 
