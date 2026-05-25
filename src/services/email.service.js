@@ -9,7 +9,7 @@ class EmailService {
 
   async sendInvitationEmail(email, token, role) {
     try {
-      const invitationLink = `${this.frontendUrl}/register?token=${token}`;
+      const invitationLink = `${this.frontendUrl}/auth/register?token=${token}`;
 
       const response = await this.resend.emails.send({
         from: "ProjectManager <onboarding@resend.dev>",

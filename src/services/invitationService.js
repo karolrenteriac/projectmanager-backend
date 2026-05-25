@@ -1,5 +1,6 @@
 const Invitation = require("../models/invitation");
 const { getEmailService } = require("./email.service");
+const { AppError } = require("../errors/AppError");
 
 /**
  * Create invitation with email sending
@@ -9,9 +10,7 @@ async function createInvitation(email, role, createdBy, organization) {
     // Validate email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      const error = new Error("Invalid email format");
-      error.status = 400;
-      throw error;
+      throw new AppError(400, "Invalid email format");
     }
 
     // Check if invitation already exists
@@ -22,9 +21,7 @@ async function createInvitation(email, role, createdBy, organization) {
     });
 
     if (existingInvitation) {
-      const error = new Error("Invitation already exists for this email");
-      error.status = 400;
-      throw error;
+      throw new AppError(400, "Invitation already exists for this email");
     }
 
     // Generate token
@@ -100,23 +97,17 @@ async function getInvitationByToken(token) {
     const invitation = await Invitation.findOne({ token });
 
     if (!invitation) {
-      const error = new Error("Invitation not found");
-      error.status = 404;
-      throw error;
+      throw new AppError(404, "Invitation not found");
     }
 
-    // Check if expired
-    if (new Date() > invitation.expiresAt && !invitation.used) {
-      const error = new Error("Invitation has expired");
-      error.status = 410;
-      throw error;
+    // Check if expired (before checking used, so expired+used shows the right message)
+    if (!invitation.used && new Date() > invitation.expiresAt) {
+      throw new AppError(410, "Invitation has expired");
     }
 
     // Check if already used
     if (invitation.used) {
-      const error = new Error("Invitation has already been used");
-      error.status = 400;
-      throw error;
+      throw new AppError(400, "Invitation has already been used");
     }
 
     return invitation;
@@ -138,9 +129,7 @@ async function markInvitationAsUsed(token) {
     );
 
     if (!invitation) {
-      const error = new Error("Invitation not found");
-      error.status = 404;
-      throw error;
+      throw new AppError(404, "Invitation not found");
     }
 
     return invitation;
