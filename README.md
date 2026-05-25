@@ -1,97 +1,100 @@
-# Backend - Project Manager
+README - Backend
+Plataforma de Gestión Colaborativa de Proyectos de Investigación
 
-Backend API para el sistema de gestión de proyectos con sistema de invitaciones y roles.
+Backend desarrollado con Node.js, Express.js, Socket.io y MongoDB para la gestión colaborativa de proyectos de investigación académica.
 
-## Estructura del Proyecto
+Tecnologías Utilizadas
+Node.js
+Express.js
+MongoDB + Mongoose
+Socket.io
+JWT Authentication
+bcryptjs
+Multer
+Cloudinary / almacenamiento de archivos
+Docker
+Nginx
+AWS EC2
+Arquitectura del Backend
 
-```
-backend/
-├── src/
-│   ├── controllers/         # Controladores de API
-│   │   ├── authController.js
-│   │   ├── invitationController.js
-│   │   └── ...
-│   ├── services/           # Lógica de negocio
-│   │   ├── userService.js
-│   │   ├── invitationService.js
-│   │   └── ...
-│   ├── models/             # Modelos Mongoose
-│   │   ├── user.js
-│   │   ├── invitation.js
-│   │   └── ...
-│   ├── routes/             # Definición de rutas
-│   │   ├── authRouters.js
-│   │   ├── invitationRoutes.js
-│   │   └── ...
-│   ├── middleware/         # Middlewares
-│   │   ├── authMiddleware.js
-│   │   └── roleMiddleware.js
-│   ├── dtos/               # Data Transfer Objects
-│   │   ├── userDto.js
-│   │   ├── invitationDto.js
-│   │   └── ...
-│   ├── constants/          # Constantes centralizadas
-│   │   ├── roles.js
-│   │   └── index.js
-│   ├── utils/              # Utilidades
-│   ├── errors/             # Manejo de errores
-│   ├── sockets/            # Configuración de sockets
-│   ├── config/             # Configuración
-│   ├── app.js              # Configuración de Express
-│   └── server.js           # Punto de entrada
-├── package.json
-├── package-lock.json
-└── .gitignore
-```
+El backend fue desarrollado bajo una arquitectura modular basada en APIs REST y comunicación en tiempo real mediante WebSockets.
 
-## Características
-
-- **Sistema de Invitaciones**: Creación y gestión de invitaciones con tokens seguros
-- **Gestión de Roles**: Admin, Coordinator, Principal, Co-researcher
-- **Autenticación JWT**: Sistema seguro de autenticación
-- **Validaciones**: Validaciones robustas en todos los endpoints
-- **DTOs**: Transformación consistente de datos
-- **Manejo de Errores**: Sistema centralizado de manejo de errores
-
-## Instalación
-
-```bash
+Módulos principales
+Módulo	Descripción
+auth	Autenticación y autorización
+users	Gestión de usuarios
+projects	Gestión de proyectos
+tasks	Gestión de tareas
+files	Gestión documental
+chat	Mensajería en tiempo real
+notifications	Notificaciones
+reports	Generación de reportes
+dashboard	Métricas y estadísticas
+Instalación del Proyecto
+1. Clonar repositorio
+git clone https://github.com/USUARIO/backend-investigacion.git
+cd backend-investigacion
+2. Instalar dependencias
 npm install
-```
+3. Configurar variables de entorno
 
-## Variables de Entorno
+Crear archivo:
 
-Asegúrate de configurar las siguientes variables de entorno:
+.env
 
-- `JWT_SECRET`: Secreto para tokens JWT
-- `MONGODB_URI`: URL de conexión a MongoDB
+Basado en:
 
-## Endpoints Principales
+.env.example
+4. Ejecutar proyecto
+Desarrollo
+npm run dev
+Producción
+npm start
+Scripts Disponibles
+npm run dev
+npm run start
+npm run build
+Estructura del Proyecto
+src/
+ ├── config/
+ ├── controllers/
+ ├── middlewares/
+ ├── models/
+ ├── routes/
+ ├── services/
+ ├── sockets/
+ ├── utils/
+ ├── validations/
+ └── app.js
+Funcionalidades Principales
+Registro e inicio de sesión con JWT
+Gestión de roles y permisos
+CRUD de proyectos
+Gestión de tareas Kanban
+Subida de archivos
+Chat en tiempo real
+Notificaciones automáticas
+Dashboard de métricas
+Exportación de reportes PDF y Excel
+Seguridad
 
-### Autenticación
-- `POST /api/auth/register` - Registro de usuarios
-- `POST /api/auth/login` - Inicio de sesión
+El sistema implementa:
 
-### Invitaciones (solo admin)
-- `POST /api/invitations` - Crear invitación
-- `GET /api/invitations` - Listar invitaciones
-- `GET /api/invitations/:token` - Verificar invitación
+Autenticación JWT
+Hash de contraseñas con bcrypt
+Middleware de autorización
+Validación de datos
+Protección CORS
+Variables de entorno seguras
+Control de acceso por roles
+Despliegue
 
-## Scripts
+La aplicación backend puede desplegarse mediante:
 
-```bash
-npm start      # Iniciar servidor
-npm dev        # Modo desarrollo (si está configurado)
-npm test       # Ejecutar tests
-```
+Docker
+AWS EC2
+Nginx como proxy inverso
+MongoDB Atlas
+Autor
 
-## Arquitectura
-
-El proyecto sigue una arquitectura modular y limpia:
-
-- **Controllers**: Manejan las peticiones HTTP
-- **Services**: Contienen la lógica de negocio
-- **Models**: Definen la estructura de datos
-- **DTOs**: Transforman los datos para las respuestas API
-- **Middleware**: Manejan autenticación y autorización
-- **Constants**: Centralizan configuraciones y constantes
+Proyecto académico desarrollado para trabajo de grado universitario.
