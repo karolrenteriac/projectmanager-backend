@@ -97,4 +97,4 @@ Nginx como proxy inverso
 MongoDB Atlas
 Autor
 
-Proyecto académico desarrollado para trabajo de grado universitario.
+
